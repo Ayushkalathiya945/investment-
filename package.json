@@ -31,6 +31,6 @@
     "typescript": "^5"
   },
   "lint-staged": {
-    "*": "pnpm lint"
+    "*/.{js,jsx,ts,tsx}": "pnpm lint"
   }
 }
