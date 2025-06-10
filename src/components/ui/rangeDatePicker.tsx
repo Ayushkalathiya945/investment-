@@ -1,9 +1,11 @@
 "use client";
 
+import type { DateRange } from "react-day-picker";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
+import { LucideCalendarFold } from "lucide-react";
 import * as React from "react";
-import type { DateRange } from "react-day-picker";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -16,7 +18,6 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { LucideCalendarFold } from "lucide-react";
 
 const formSchema = z.object({
     dateRange: z
@@ -30,11 +31,11 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 // help me to add the props to the component
-interface RangeDatePickerProps {
+type RangeDatePickerProps = {
     onChange: (date: DateRange) => void;
     from?: string;
     to?: string;
-}
+};
 
 const RangeDatePicker: React.FC<RangeDatePickerProps> = ({ from, to, onChange }) => {
     const form = useForm<FormValues>({
@@ -58,7 +59,7 @@ const RangeDatePicker: React.FC<RangeDatePickerProps> = ({ from, to, onChange })
             to: undefined,
         });
         onChange({ from: undefined, to: undefined });
-    }
+    };
 
     // Update form value when date changes
     React.useEffect(() => {
@@ -83,22 +84,29 @@ const RangeDatePicker: React.FC<RangeDatePickerProps> = ({ from, to, onChange })
                                             variant="outline"
                                             className={cn(
                                                 "w-full justify-between text-left font-normal h-10 lg:h-12 px-4 py-2 border-border bg-transparent rounded-xl",
-                                                !field.value && "text-[989898]"
+                                                !field.value && "text-[989898]",
                                             )}
                                         >
                                             <span className="text-xs">
-                                                {field.value?.from instanceof Date ? (
-                                                    field.value.to instanceof Date ? (
-                                                        <>
-                                                            {format(field.value.from, "LLL dd, y")} -{" "}
-                                                            {format(field.value.to, "LLL dd, y")}
-                                                        </>
-                                                    ) : (
-                                                        format(field.value.from, "LLL dd, y")
-                                                    )
-                                                ) : (
-                                                    "Date Range"
-                                                )}
+                                                {field.value?.from instanceof Date
+                                                    ? (
+                                                            field.value.to instanceof Date
+                                                                ? (
+                                                                        <>
+                                                                            {format(field.value.from, "LLL dd, y")}
+                                                                            {" "}
+                                                                            -
+                                                                            {" "}
+                                                                            {format(field.value.to, "LLL dd, y")}
+                                                                        </>
+                                                                    )
+                                                                : (
+                                                                        format(field.value.from, "LLL dd, y")
+                                                                    )
+                                                        )
+                                                    : (
+                                                            "Date Range"
+                                                        )}
 
                                             </span>
                                             <LucideCalendarFold className="h-6 w-6 text-primary" />

@@ -2,11 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 
-interface PaginationProps {
+type PaginationProps = {
     currentPage: number;
     totalPages: number;
     onPageChange: (page: number) => void;
-}
+};
 
 export function Pagination({
     currentPage,
@@ -85,75 +85,75 @@ export function Pagination({
             </Button>
 
             {/* Page numbers */}
-            {totalPages <= 5 ? (
-                // Simple pagination for 5 or fewer pages
-                pageNumbers.map((page) => (
-                    <Button
-                        key={`page-${page}`}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => onPageChange(page as number)}
-                        className="w-9 border-none"
-                    >
-                        {page}
-                    </Button>
-                ))
-            ) : (
-                // Complex pagination for more than 5 pages
-                <>
-                    {/* First page */}
-                    <Button
-                        variant={currentPage === 1 ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => onPageChange(1)}
-                        className="w-9"
-                    >
-                        1
-                    </Button>
-
-                    {/* Middle pages with ellipsis */}
-                    {pageNumbers.map((page, index) => {
-                        if (
-                            page === "ellipsis-start" ||
-                            page === "ellipsis-end"
-                        ) {
-                            return (
-                                <span key={`${page}-${index}`} className="px-2">
-                                    ...
-                                </span>
-                            );
-                        }
-                        return (
+            {totalPages <= 5
+                ? (
+                        pageNumbers.map(page => (
                             <Button
-                                key={`page-${page}-${index}`}
-                                variant={
-                                    currentPage === page ? "default" : "outline"
-                                }
+                                key={`page-${page}`}
+                                variant={currentPage === page ? "default" : "outline"}
                                 size="sm"
-                                onClick={() =>
-                                    typeof page === "number" &&
-                                    onPageChange(page)
-                                }
-                                className="w-9"
+                                onClick={() => onPageChange(page as number)}
+                                className="w-9 border-none"
                             >
                                 {page}
                             </Button>
-                        );
-                    })}
+                        ))
+                    )
+                : (
+                    // Complex pagination for more than 5 pages
+                        <>
+                            {/* First page */}
+                            <Button
+                                variant={currentPage === 1 ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => onPageChange(1)}
+                                className="w-9"
+                            >
+                                1
+                            </Button>
 
-                    {/* Last page */}
-                    <Button
-                        variant={
-                            currentPage === totalPages ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => onPageChange(totalPages)}
-                        className="w-9"
-                    >
-                        {totalPages}
-                    </Button>
-                </>
-            )}
+                            {/* Middle pages with ellipsis */}
+                            {pageNumbers.map((page, index) => {
+                                if (
+                                    page === "ellipsis-start"
+                                    || page === "ellipsis-end"
+                                ) {
+                                    return (
+                                        <span key={`${page}-${index}`} className="px-2">
+                                            ...
+                                        </span>
+                                    );
+                                }
+                                return (
+                                    <Button
+                                        key={`page-${page}-${index}`}
+                                        variant={
+                                            currentPage === page ? "default" : "outline"
+                                        }
+                                        size="sm"
+                                        onClick={() =>
+                                            typeof page === "number"
+                                            && onPageChange(page)}
+                                        className="w-9"
+                                    >
+                                        {page}
+                                    </Button>
+                                );
+                            })}
+
+                            {/* Last page */}
+                            <Button
+                                variant={
+                                    currentPage === totalPages ? "default" : "outline"
+                                }
+                                size="sm"
+                                onClick={() => onPageChange(totalPages)}
+                                className="w-9"
+                            >
+                                {totalPages}
+                            </Button>
+                        </>
+                    )}
 
             {/* Next page button */}
             <Button

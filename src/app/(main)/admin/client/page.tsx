@@ -1,18 +1,17 @@
 "use client";
-import { Copy, Edit, IndianRupee, Search, TrendingDown, TrendingUp, Users } from "lucide-react";
+import type { DateRange } from "react-day-picker";
+
+import { IndianRupee, Search, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import toast from "react-hot-toast";
 
-import StatCard from "@/components/StatCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pagination } from "@/components/ui/pagination";
-import { PAGE_LIMIT } from "@/lib/constants";
-import RangeDatePicker from "@/components/ui/rangeDatePicker";
-import { DateRange } from "react-day-picker";
 import AddClient from "@/components/Dialoge/AddClient";
+import StatCard from "@/components/StatCard";
+import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import RangeDatePicker from "@/components/ui/rangeDatePicker";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PAGE_LIMIT } from "@/lib/constants";
 
 const data = [
     {
@@ -20,100 +19,100 @@ const data = [
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "2",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "3",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "4",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "5",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "6",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "7",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "8",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "9",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "10",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "11",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "12",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "13",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
+        Email: "Surat, Gujarat",
     },
     {
         id: "14",
         name: "Varun Sharma",
         panNo: "VS Fashion Hub",
         mobile: "8768945783",
-        Email: "Surat, Gujarat"
-    }
-]
+        Email: "Surat, Gujarat",
+    },
+];
 
 const Client: React.FC = () => {
     const router = useRouter();
@@ -123,16 +122,17 @@ const Client: React.FC = () => {
 
     const [searchTerm, setSearchTerm] = useState("");
     const filteredData = data.filter((item) => {
-        const matchesSearch =
-            item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.id.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch
+            = item.name.toLowerCase().includes(searchTerm.toLowerCase())
+                || item.id.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesDate = (() => {
-            if (!dateRange?.from || !dateRange?.to) return true;
+            if (!dateRange?.from || !dateRange?.to)
+                return true;
             const itemDate = new Date();
             return (
-                itemDate >= dateRange.from &&
-                itemDate <= dateRange.to
+                itemDate >= dateRange.from
+                && itemDate <= dateRange.to
             );
         })();
         return matchesSearch && matchesDate;
@@ -157,7 +157,7 @@ const Client: React.FC = () => {
         <div className="flex flex-col w-full min-h-[94vh] gap-5">
             <div className="flex justify-between w-full">
                 <h1 className="text-3xl font-semibold">Clients</h1>
-                <div className="flex gap-4">
+                <div className="flex gap-4 items-center">
                     <div className="md:w-1/2 w-full">
                         <RangeDatePicker
                             from={dateRange?.from?.toISOString()}
@@ -165,14 +165,14 @@ const Client: React.FC = () => {
                             onChange={handleDateChange}
                         />
                     </div>
-                    <AddClient name="+Add Client"/>
+                    <AddClient name="Add Client" />
                 </div>
             </div>
             <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1  justify-between gap-3 px-2">
                 <StatCard icon={<Users />} value={980} label="Total Clients" />
-                <StatCard icon={<IndianRupee />} value={"₹2,00,000"} label="Total Value" />
-                <StatCard icon={<TrendingUp />} value={"₹1,00,000"} label="Total Bokerage" />
-                <StatCard icon={<TrendingDown />} value={"₹90,000"} label="Brokerage Remaining" />
+                <StatCard icon={<IndianRupee />} value="₹2,00,000" label="Total Value" />
+                <StatCard icon={<TrendingUp />} value="₹1,00,000" label="Total Bokerage" />
+                <StatCard icon={<TrendingDown />} value="₹90,000" label="Brokerage Remaining" />
             </div>
             <div className="relative w-full">
                 <div className="absolute left-5 top-1/2 -translate-y-1/2 z-10 text-sm pointer-events-none">
@@ -185,7 +185,7 @@ const Client: React.FC = () => {
                         setSearchTerm(e.target.value);
                         setCurrentPage(1);
                     }}
-                    className="pl-10 rounded-xl bg-white border border-border"
+                    className="pl-10 rounded-xl bg-white border border-border text-sm"
                 />
 
             </div>
@@ -204,16 +204,16 @@ const Client: React.FC = () => {
                         </TableHeader>
 
                         <TableBody>
-                            {paginatedData.map((item) => {
+                            {paginatedData.map((item, index) => {
                                 return (
                                     <TableRow key={item.id} className="w-full py-10 gap-4 mx-3 cursor-pointer" onClick={() => { router.push(`/admin/client/${item.id}`); }}>
-                                        <TableCell>{item.id}</TableCell>
+                                        <TableCell>{index + 1}</TableCell>
                                         <TableCell>{item.name}</TableCell>
                                         <TableCell>{item.panNo}</TableCell>
                                         <TableCell>{item.mobile}</TableCell>
                                         <TableCell>{item.Email}</TableCell>
                                     </TableRow>
-                                )
+                                );
                             })}
 
                         </TableBody>
@@ -223,7 +223,7 @@ const Client: React.FC = () => {
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
-                    onPageChange={(page) => setCurrentPage(page)}
+                    onPageChange={page => setCurrentPage(page)}
                 />
             </div>
 

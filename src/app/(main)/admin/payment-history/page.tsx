@@ -1,62 +1,54 @@
 "use client";
-import { Copy, Edit, IndianRupee, Search, TrendingDown, TrendingUp, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
-import React, { useState } from "react";
-import toast from "react-hot-toast";
+import type { DateRange } from "react-day-picker";
 
-import StatCard from "@/components/StatCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pagination } from "@/components/ui/pagination";
-import { PAGE_LIMIT, TYPE } from "@/lib/constants";
-import RangeDatePicker from "@/components/ui/rangeDatePicker";
-import { DateRange } from "react-day-picker";
-import AddClient from "@/components/Dialoge/AddClient";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React, { useState } from "react";
+
 import AddPayment from "@/components/Dialoge/AddPayment";
+import { Pagination } from "@/components/ui/pagination";
+import RangeDatePicker from "@/components/ui/rangeDatePicker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PAGE_LIMIT, TYPE } from "@/lib/constants";
 
 const data = [
     {
         id: "1",
         client: "Varun Sharma",
         amount: "VS Fashion Hub",
-        date: "8768945783",
+        date: "02-03-2024",
     },
     {
         id: "1",
         client: "Varun Sharma",
         amount: "VS Fashion Hub",
-        date: "8768945783",
+        date: "02-03-2024",
     },
     {
         id: "1",
         client: "Varun Sharma",
         amount: "VS Fashion Hub",
-        date: "8768945783",
+        date: "02-03-2024",
     },
     {
         id: "1",
         client: "Varun Sharma",
         amount: "VS Fashion Hub",
-        date: "8768945783",
-    }
-]
+        date: "02-03-2024",
+    },
+];
 
 const PaymentHistory: React.FC = () => {
-    const router = useRouter();
-
     const [currentPage, setCurrentPage] = useState(1);
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
-    const [searchTerm, setSearchTerm] = useState("");
-    const filteredData = data.filter((item) => {
+    const filteredData = data.filter(() => {
         const matchesDate = (() => {
-            if (!dateRange?.from || !dateRange?.to) return true;
+            if (!dateRange?.from || !dateRange?.to)
+                return true;
             const itemDate = new Date();
             return (
-                itemDate >= dateRange.from &&
-                itemDate <= dateRange.to
+                itemDate >= dateRange.from
+                && itemDate <= dateRange.to
             );
         })();
         return matchesDate;
@@ -79,16 +71,16 @@ const PaymentHistory: React.FC = () => {
 
     return (
         <div className="flex flex-col w-full min-h-[94vh] gap-5">
-            <div className="flex justify-between w-full">
-                <h1 className="text-3xl font-semibold">Brokerage</h1>
-                <div className="flex gap-4">
+            <div className="flex-col md:flex md:flex-row justify-between w-full items-center">
+                <h1 className="text-3xl font-semibold">Payment History</h1>
+                <div className="flex-col md:flex md:flex-row gap-4 items-center">
                     <div className="flex min-w-50 ">
                         <Select>
                             <SelectTrigger className="w-full ring-0">
                                 <SelectValue placeholder="All Client" />
                             </SelectTrigger>
                             <SelectContent>
-                                {TYPE.map((item) => (
+                                {TYPE.map(item => (
                                     <SelectItem
                                         className="cursor-pointer"
                                         key={item}
@@ -100,7 +92,7 @@ const PaymentHistory: React.FC = () => {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="md:w-1/2 w-full">
+                    <div className="md:w-1/2 w-full my-3 md:my-0">
                         <RangeDatePicker
                             from={dateRange?.from?.toISOString()}
                             to={dateRange?.to?.toISOString()}
@@ -124,15 +116,15 @@ const PaymentHistory: React.FC = () => {
                         </TableHeader>
 
                         <TableBody>
-                            {paginatedData.map((item) => {
+                            {paginatedData.map((item, index) => {
                                 return (
-                                    <TableRow key={item.id} className="w-full py-10 gap-4 mx-3 cursor-pointer" onClick={() => { router.push(`/admin/client/${item.id}`); }}>
-                                        <TableCell>{item.id}</TableCell>
+                                    <TableRow key={item.id} className="w-full py-10 gap-4 mx-3">
+                                        <TableCell>{index + 1}</TableCell>
                                         <TableCell>{item.client}</TableCell>
                                         <TableCell>{item.amount}</TableCell>
                                         <TableCell>{item.date}</TableCell>
                                     </TableRow>
-                                )
+                                );
                             })}
 
                         </TableBody>
@@ -142,7 +134,7 @@ const PaymentHistory: React.FC = () => {
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
-                    onPageChange={(page) => setCurrentPage(page)}
+                    onPageChange={page => setCurrentPage(page)}
                 />
             </div>
 

@@ -1,5 +1,12 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { DialogTrigger } from "@radix-ui/react-dialog";
+import React, { useEffect } from "react";
+import { useForm } from "react-hook-form";
+
+import type { AddClient, AddClientField } from "@/types/client";
+
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -13,26 +20,21 @@ import {
     FormControl,
     FormField,
     FormItem,
-    FormMessage
+    FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { AddClient, AddClientField, addClientSchema } from "@/types/client";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { DialogTrigger } from "@radix-ui/react-dialog";
-import React, { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { addClientSchema } from "@/types/client";
 
-interface AddClientProps {
+type AddClientProps = {
     data?: AddClient;
     name?: string;
-}
+};
 
 const AddOrder: React.FC<AddClientProps> = ({
     data,
     name,
 }) => {
-
     const addClientForm = useForm<AddClientField>({
         defaultValues: {
             name: "",
@@ -42,7 +44,7 @@ const AddOrder: React.FC<AddClientProps> = ({
             address: "",
         },
         resolver: zodResolver(addClientSchema),
-        mode: "onSubmit",   
+        mode: "onSubmit",
     });
 
     const onSubmit = async (data: AddClientField) => {
@@ -60,130 +62,133 @@ const AddOrder: React.FC<AddClientProps> = ({
     }, [data]);
 
     return (
-            <Dialog>
-                <DialogTrigger asChild>
-                    <Button className="ml-auto bg-primary px-8 rounded-xl">{name}</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-2xl min-w-[300px] p-6">
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button className="ml-auto bg-primary px-5 md:px-8 rounded-xl">
+                    +
+                    <span className="hidden md:flex">{name}</span>
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl min-w-[300px] p-6">
 
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-medium">
-                            Add New Client
-                        </DialogTitle>
-                    </DialogHeader>
+                <DialogHeader>
+                    <DialogTitle className="text-xl font-medium">
+                        Add New Client
+                    </DialogTitle>
+                </DialogHeader>
 
-                    <div className="max-h-[calc(100vh-220px)] overflow-y-scroll">
-                        <Form {...addClientForm}>
-                            <form className="flex flex-col gap-4">
-                                <div className="flex flex-col md:flex-row w-full gap-4">
-                                    <div className="w-full">
-                                        <FormField
-                                            control={addClientForm.control}
-                                            name="name"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input
-                                                            placeholder="Full Name"
-                                                            {...field}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    <div className="w-full">
-                                        <FormField
-                                            control={addClientForm.control}
-                                            name="panNo"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input
-                                                            placeholder="PAN No."
-                                                            {...field}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
+                <div className="max-h-[calc(100vh-220px)] overflow-y-scroll">
+                    <Form {...addClientForm}>
+                        <form className="flex flex-col gap-4">
+                            <div className="flex flex-col md:flex-row w-full gap-4">
+                                <div className="w-full">
+                                    <FormField
+                                        control={addClientForm.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="Full Name"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 </div>
 
-                                <div className="flex flex-col md:flex-row w-full gap-4">
-                                    <div className="w-full">
-                                        <FormField
-                                            control={addClientForm.control}
-                                            name="mobileNo"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input
-                                                            placeholder="Mobile No."
-                                                            {...field}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="w-full">
-                                        <FormField
-                                            control={addClientForm.control}
-                                            name="email"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input
-                                                            placeholder="Email"
-                                                            {...field}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
+                                <div className="w-full">
+                                    <FormField
+                                        control={addClientForm.control}
+                                        name="panNo"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="PAN No."
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 </div>
+                            </div>
 
-                                <FormField
-                                    control={addClientForm.control}
-                                    name="address"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormControl>
-                                                <Textarea
-                                                    placeholder="Address"
-                                                    {...field ?? undefined}
-                                                    className="border-none ring-0 focus:ring-0 focus:ring-offset-0"
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                            <div className="flex flex-col md:flex-row w-full gap-4">
+                                <div className="w-full">
+                                    <FormField
+                                        control={addClientForm.control}
+                                        name="mobileNo"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="Mobile No."
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                                <div className="w-full">
+                                    <FormField
+                                        control={addClientForm.control}
+                                        name="email"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="Email"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            </div>
 
-                            </form>
-                        </Form>
+                            <FormField
+                                control={addClientForm.control}
+                                name="address"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="Address"
+                                                {...field ?? undefined}
+                                                className="border-none ring-0 focus:ring-0 focus:ring-offset-0"
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                        </form>
+                    </Form>
+                </div>
+                <DialogFooter className="">
+                    <div className="w-full flex items-center justify-end">
+                        <Button
+                            type="button"
+                            className="bg-primary text-sm px-8 rounded-xl"
+                            onClick={addClientForm.handleSubmit(onSubmit)}
+                            disabled={addClientForm.formState.isSubmitting}
+                        >
+                            Save
+                        </Button>
                     </div>
-                    <DialogFooter className="">
-                        <div className="w-full flex items-center justify-end">
-                            <Button
-                                type="button"
-                                className="bg-primary text-sm px-8 rounded-xl"
-                                onClick={addClientForm.handleSubmit(onSubmit)}
-                                disabled={addClientForm.formState.isSubmitting}
-                            >
-                                Save
-                            </Button>
-                        </div>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };
 

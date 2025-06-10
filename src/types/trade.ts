@@ -5,15 +5,7 @@ export const addTradeSchema = z.object({
     trade: z.string().optional(),
     stock: z.string().optional(),
     quantity: z.string().email().optional(),
-    pricePerShare: z.string(),
+    date: z.string().optional(),
+    pricePerShare: z.number().optional(),
 });
-export type AddTradeField = z.infer<typeof addTradeSchema>
-
-export type AddTrade = {
-    id?: string;
-    client?: string;
-    trade?: string;
-    stock?: string;
-    quantity?: string;
-    pricePerShare?: string;
-}
+export type AddTradeField = z.infer<typeof addTradeSchema>;

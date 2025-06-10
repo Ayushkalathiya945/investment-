@@ -1,13 +1,13 @@
 {
-  "name": "investasure-brokerage",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
+    "name": "investasure-brokerage",
+      "version": "0.1.0",
+    "private": true,
+    "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "lint:fix": "eslint . --fix",
+    "lint:fix": "eslint src --fix",
     "prepare": "husky"
   },
   "dependencies": {

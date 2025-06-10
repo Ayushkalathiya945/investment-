@@ -8,7 +8,7 @@ export const addClientSchema = z.object({
     address: z.string(),
 });
 
-export type AddClientField = z.infer<typeof addClientSchema>
+export type AddClientField = z.infer<typeof addClientSchema>;
 
 export type AddClient = {
     id?: string;
@@ -17,4 +17,4 @@ export type AddClient = {
     mobileNo?: string;
     email?: string;
     address?: string;
-}
+};

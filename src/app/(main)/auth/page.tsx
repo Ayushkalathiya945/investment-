@@ -1,7 +1,7 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { loginSchema } from "@/types/auth.types";
-import { useRouter } from "next/navigation";
 
 const Auth: React.FC = () => {
     const router = useRouter();
@@ -27,7 +26,6 @@ const Auth: React.FC = () => {
 
     const onSubmit = (data: LoginField) => {
         console.log(data);
-        form.reset();
         router.push("/admin/client");
     };
 
