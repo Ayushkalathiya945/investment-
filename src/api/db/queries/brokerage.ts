@@ -1,8 +1,9 @@
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
+import type { TransactionType } from "@/api/db";
 import type { NewBrokerage } from "@/api/db/schema";
 
-import { getDB, type TransactionType } from "@/api/db";
+import { getDB } from "@/api/db";
 import { brokerages } from "@/api/db/schema";
 
 export async function create(data: NewBrokerage, tx?: TransactionType) {
@@ -29,7 +30,7 @@ export async function findOne(data: { id: number }, tx?: TransactionType) {
     });
 }
 
-export async function findAllWithPagination(data: { page: number; limit: number; clientId?: number, from?: number, to?: number }, tx?: TransactionType) {
+export async function findAllWithPagination(data: { page: number; limit: number; clientId?: number; from?: number; to?: number }, tx?: TransactionType) {
     const conditions = [];
     if (data.clientId)
         conditions.push(eq(brokerages.clientId, data.clientId));
@@ -58,7 +59,7 @@ export async function findAllWithPagination(data: { page: number; limit: number;
 
 // help me to create a query to calculate the total brokerage amount of particular client
 // do the calculation in database
-export async function calculateTotalbrokerageAmount(data: { clientId?: number, from?: number, to?: number }, tx?: TransactionType) {
+export async function calculateTotalbrokerageAmount(data: { clientId?: number; from?: number; to?: number }, tx?: TransactionType) {
     const conditions = [];
 
     if (data.clientId)

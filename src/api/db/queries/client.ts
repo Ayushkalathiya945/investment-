@@ -1,8 +1,9 @@
 import { and, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 
+import type { TransactionType } from "@/api/db";
 import type { NewClient } from "@/api/db/schema";
 
-import { getDB, type TransactionType } from "@/api/db";
+import { getDB } from "@/api/db";
 import { clients } from "@/api/db/schema";
 
 export async function create(data: NewClient, tx?: TransactionType) {
@@ -93,9 +94,9 @@ export async function findAllWithPagination(data: { page: number; limit: number;
     return { clients: clientsData, count: clientCount && clientCount.length > 0 ? clientCount[0].count : 0 };
 }
 
-export async function calculateTotalClient(data: {from?: number, to?: number}, tx?: TransactionType) {
+export async function calculateTotalClient(data: { from?: number; to?: number }, tx?: TransactionType) {
     const conditions = [];
-    
+
     if (data.from)
         conditions.push(gte(clients.createdAt, data.from));
     if (data.to)

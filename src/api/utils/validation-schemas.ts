@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TradeType } from "@/api/db/schema";
+
 // Authentication schemas
 export const loginSchema = z.object({
     username: z.string().min(3, "Username must be at least 3 characters"),
@@ -43,46 +45,23 @@ export const updateStockSchema = stockSchema.partial();
 export const tradeSchema = z.object({
     clientId: z.number().int().positive("Client ID must be positive"),
     stockId: z.number().int().positive("Stock ID must be positive"),
-    type: z.enum(["buy", "sell"], {
-        errorMap: () => ({ message: "Trade type must be either buy or sell" }),
-    }),
+    type: z.nativeEnum(TradeType),
     quantity: z.number().int().positive("Quantity must be positive"),
     price: z.number().positive("Price must be positive"),
     tradeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    settlementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    brokerageFee: z.number().nonnegative("Brokerage fee must be non-negative"),
-    gst: z.number().nonnegative("GST must be non-negative"),
-    stt: z.number().nonnegative("STT must be non-negative"),
-    stampDuty: z.number().nonnegative("Stamp duty must be non-negative"),
-    exchangeFee: z.number().nonnegative("Exchange fee must be non-negative"),
-    sebiFee: z.number().nonnegative("SEBI fee must be non-negative"),
     notes: z.string().optional(),
 });
 
-export const updateTradeSchema = tradeSchema.partial();
-
-// Brokerage calculation schemas
-export const brokerageCalculationSchema = z.object({
-    clientId: z.number().int().positive("Client ID must be positive"),
-    month: z.number().int().min(1).max(12, "Month must be between 1 and 12"),
-    year: z.number().int().min(2000).max(2100, "Year must be valid"),
-});
-
-export const bulkBrokerageCalculationSchema = z.object({
-    month: z.number().int().min(1).max(12, "Month must be between 1 and 12"),
-    year: z.number().int().min(2000).max(2100, "Year must be valid"),
+export const updateTradeSchema = tradeSchema.partial().extend({
+    id: z.number().int().positive("Trade ID must be positive"),
 });
 
 // Payment schemas
 export const paymentSchema = z.object({
     clientId: z.number().int().positive("Client ID must be positive"),
-    brokerageCalculationId: z.number().int().positive("Brokerage calculation ID must be positive").optional(),
     amount: z.number().positive("Amount must be positive"),
+    description: z.string().optional(),
     paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    paymentMethod: z.enum(["upi", "netbanking", "card", "cash", "cheque"], {
-        errorMap: () => ({ message: "Invalid payment method" }),
-    }),
-    referenceNumber: z.string().optional(),
     notes: z.string().optional(),
 });
 
@@ -99,11 +78,16 @@ export const dateRangeSchema = z.object({
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be in YYYY-MM-DD format").optional(),
 });
 
+// Brokerage calculation schemas
+export const brokerageFilterSchema = paginationSchema.extend({
+    clientId: z.number().int().positive("Client ID must be positive"),
+    month: z.number().int().min(1).max(12, "Month must be between 1 and 12"),
+    year: z.number().int().min(2000).max(2100, "Year must be valid"),
+});
+
 export const clientFilterSchema = paginationSchema.extend({
     search: z.string().optional(),
-    from: z.number().optional(),
-    to: z.number().optional(),
-});
+}).merge(dateRangeSchema);
 
 export const clientGetOneSchema = z.object({
     id: z.number().int().positive("Client ID must be positive"),
@@ -118,10 +102,14 @@ export const stockFilterSchema = paginationSchema.extend({
 export const tradeFilterSchema = paginationSchema.extend({
     clientId: z.number().optional(),
     stockId: z.number().optional(),
-    type: z.enum(["buy", "sell"]).optional(),
+    type: z.nativeEnum(TradeType).optional(),
+    search: z.string().optional(),
 }).merge(dateRangeSchema);
 
+export const tradeGetOneSchema = z.object({
+    id: z.number().int().positive("Trade ID must be positive"),
+});
+
 export const paymentFilterSchema = paginationSchema.extend({
-    clientId: z.string().optional().transform(val => val ? Number.parseInt(val, 10) : undefined),
-    paymentMethod: z.enum(["upi", "netbanking", "card", "cash", "cheque"]).optional(),
+    clientId: z.number(),
 }).merge(dateRangeSchema);

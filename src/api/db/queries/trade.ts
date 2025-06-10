@@ -1,8 +1,9 @@
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
-import type { NewTrade } from "@/api/db/schema";
+import type { TransactionType } from "@/api/db";
+import type { NewTrade, TradeType } from "@/api/db/schema";
 
-import { getDB, type TransactionType } from "@/api/db";
+import { getDB } from "@/api/db";
 import { trades } from "@/api/db/schema";
 
 export async function create(data: NewTrade, tx?: TransactionType) {
@@ -29,8 +30,22 @@ export async function findOne(data: { id: number }, tx?: TransactionType) {
     });
 }
 
-export async function findAllWithPagination(data: { page: number; limit: number; clientId?: number, from?: number, to?: number }, tx?: TransactionType) {
+export async function findOneWithRelations(data: { id: number }, tx?: TransactionType) {
+    return getDB(tx).query.trades.findFirst({
+        where: eq(trades.id, data.id),
+        with: {
+            client: true,
+            stock: true,
+        },
+    });
+}
+
+export async function findAllWithPagination(data: { page: number; limit: number; type?: TradeType; stockId?: number; clientId?: number; from?: number; to?: number }, tx?: TransactionType) {
     const conditions = [];
+    if (data.type)
+        conditions.push(eq(trades.type, data.type));
+    if (data.stockId)
+        conditions.push(eq(trades.stockId, data.stockId));
     if (data.clientId)
         conditions.push(eq(trades.clientId, data.clientId));
     if (data.from)
@@ -42,6 +57,10 @@ export async function findAllWithPagination(data: { page: number; limit: number;
         return { trades: [], count: 0 };
 
     const tradesData = await getDB(tx).query.trades.findMany({
+        with: {
+            client: true,
+            stock: true,
+        },
         where: and(...conditions),
         orderBy: [desc(trades.createdAt)],
         limit: data.limit,
@@ -60,7 +79,7 @@ export async function findAllWithPagination(data: { page: number; limit: number;
 // if trade type is buy the net amount is incre ase
 // if trade type is sell the net amount is decrease
 // do the calculation in database
-export async function calculateTotalTradeAmount(data: { clientId?: number, from?: number, to?: number }, tx?: TransactionType) {
+export async function calculateTotalTradeAmount(data: { clientId?: number; from?: number; to?: number }, tx?: TransactionType) {
     const conditions = [];
 
     if (data.clientId)

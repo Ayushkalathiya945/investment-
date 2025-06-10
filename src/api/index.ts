@@ -8,9 +8,7 @@ import { errorMiddleware } from "@/api/middleware/error";
 import authRouter from "@/api/routes/auth";
 import brokerageRouter from "@/api/routes/brokerage";
 import clientRouter from "@/api/routes/clients";
-import dashboardRouter from "@/api/routes/dashboard";
 import paymentRouter from "@/api/routes/payments";
-import stockRouter from "@/api/routes/stocks";
 import tradeRouter from "@/api/routes/trades";
 
 // Create Hono app
@@ -34,11 +32,9 @@ api.get("/", (c) => {
 // Mount routes
 api.route("/auth", authRouter);
 api.route("/clients", clientRouter);
-api.route("/stocks", stockRouter);
 api.route("/trades", tradeRouter);
 api.route("/brokerage", brokerageRouter);
 api.route("/payments", paymentRouter);
-api.route("/dashboard", dashboardRouter);
 
 // Export the Hono app
 export default api;

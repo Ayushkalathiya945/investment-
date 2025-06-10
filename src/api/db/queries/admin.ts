@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 
+import type { TransactionType } from "@/api/db";
 import type { NewAdmin } from "@/api/db/schema";
 
-import { getDB, type TransactionType } from "@/api/db";
+import { getDB } from "@/api/db";
 import { admins } from "@/api/db/schema";
 
 export async function create(data: NewAdmin, tx?: TransactionType) {
