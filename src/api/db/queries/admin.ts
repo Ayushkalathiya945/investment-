@@ -12,8 +12,8 @@ export async function create(data: NewAdmin, tx?: TransactionType) {
     return admin ?? null;
 }
 
-export async function update(data: Partial<NewAdmin>, tx?: TransactionType) {
-    const [admin] = await getDB(tx).update(admins).set(data).returning();
+export async function update(data: Partial<NewAdmin> & { id: number }, tx?: TransactionType) {
+    const [admin] = await getDB(tx).update(admins).set(data).where(eq(admins.id, data.id)).returning();
 
     return admin ?? null;
 }

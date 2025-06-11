@@ -12,8 +12,8 @@ export async function create(data: NewStock, tx?: TransactionType) {
     return trade ?? null;
 }
 
-export async function update(data: Partial<NewStock>, tx?: TransactionType) {
-    const [trade] = await getDB(tx).update(stocks).set(data).returning();
+export async function update(data: Partial<NewStock> & { id: number }, tx?: TransactionType) {
+    const [trade] = await getDB(tx).update(stocks).set(data).where(eq(stocks.id, data.id)).returning();
 
     return trade ?? null;
 }

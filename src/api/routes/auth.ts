@@ -31,7 +31,7 @@ authRouter.post("/login", zValidator("json", loginSchema), async (c) => {
         // Update last login timestamp
         await adminQueries.update({
             id: admin.id,
-            lastLogin: Math.floor(Date.now() / 1000),
+            lastLogin: Date.now(),
         });
 
         const token = generateToken({
