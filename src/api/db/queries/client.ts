@@ -76,9 +76,6 @@ export async function findAllWithPagination(data: { page: number; limit: number;
         ));
     }
 
-    if (conditions.length === 0)
-        return { clients: [], count: 0 };
-
     const clientsData = await getDB(tx).query.clients.findMany({
         where: and(...conditions),
         orderBy: [desc(clients.createdAt)],

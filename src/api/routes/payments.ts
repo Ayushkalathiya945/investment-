@@ -15,7 +15,7 @@ const paymentRouter = new Hono();
 paymentRouter.use("*", authMiddleware);
 
 // Record new payment
-paymentRouter.post("/", zValidator("json", paymentSchema), async (c) => {
+paymentRouter.post("/create", zValidator("json", paymentSchema), async (c) => {
     const paymentData = c.req.valid("json");
 
     try {

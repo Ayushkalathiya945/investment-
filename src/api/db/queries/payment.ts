@@ -39,9 +39,6 @@ export async function findAllWithPagination(data: { page: number; limit: number;
     if (data.to)
         conditions.push(lte(payments.createdAt, data.to));
 
-    if (conditions.length === 0)
-        return { payments: [], count: 0 };
-
     const paymentsData = await getDB(tx).query.payments.findMany({
         where: and(...conditions),
         orderBy: [desc(payments.createdAt)],

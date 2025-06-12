@@ -128,6 +128,7 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
 
         // Update trade
         const result = await tradeQueries.update({
+            id: updateData.id,
             clientId: updateData.clientId,
             stockId: updateData.stockId,
             type: updateData.type,

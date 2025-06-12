@@ -39,9 +39,6 @@ export async function findAllWithPagination(data: { page: number; limit: number;
     if (data.to)
         conditions.push(lte(brokerages.createdAt, data.to));
 
-    if (conditions.length === 0)
-        return { brokerage: [], count: 0 };
-
     const brokerageData = await getDB(tx).query.brokerages.findMany({
         where: and(...conditions),
         orderBy: [desc(brokerages.createdAt)],

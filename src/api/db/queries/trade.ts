@@ -53,9 +53,6 @@ export async function findAllWithPagination(data: { page: number; limit: number;
     if (data.to)
         conditions.push(lte(trades.createdAt, data.to));
 
-    if (conditions.length === 0)
-        return { trades: [], count: 0 };
-
     const tradesData = await getDB(tx).query.trades.findMany({
         with: {
             client: true,

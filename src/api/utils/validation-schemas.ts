@@ -90,7 +90,7 @@ export const clientFilterSchema = paginationSchema.extend({
 }).merge(dateRangeSchema);
 
 export const clientGetOneSchema = z.object({
-    id: z.number().int().positive("Client ID must be positive"),
+    id: z.coerce.number().int().positive("Client ID must be positive"),
 });
 
 export const stockFilterSchema = paginationSchema.extend({
@@ -107,7 +107,7 @@ export const tradeFilterSchema = paginationSchema.extend({
 }).merge(dateRangeSchema);
 
 export const tradeGetOneSchema = z.object({
-    id: z.number().int().positive("Trade ID must be positive"),
+    id: z.coerce.number().int().positive("Trade ID must be positive"),
 });
 
 export const paymentFilterSchema = paginationSchema.extend({
