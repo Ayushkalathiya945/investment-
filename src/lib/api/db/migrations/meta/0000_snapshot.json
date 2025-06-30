@@ -1,0 +1,1151 @@
+{
+    "version": "6",
+    "dialect": "sqlite",
+    "id": "b5d2ca2d-2e71-46ed-89a2-b275d61990c9",
+    "prevId": "00000000-0000-0000-0000-000000000000",
+    "tables": {
+        "admins": {
+            "name": "admins",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "email": {
+                    "name": "email",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "password": {
+                    "name": "password",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "updated_at": {
+                    "name": "updated_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "last_login": {
+                    "name": "last_login",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "admins_email_unique": {
+                    "name": "admins_email_unique",
+                    "columns": [
+                        "email"
+                    ],
+                    "isUnique": true
+                }
+            },
+            "foreignKeys": {},
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "brokerage_details": {
+            "name": "brokerage_details",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "brokerage_id": {
+                    "name": "brokerage_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "trade_id": {
+                    "name": "trade_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "symbol": {
+                    "name": "symbol",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "exchange": {
+                    "name": "exchange",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "quantity": {
+                    "name": "quantity",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "buy_price": {
+                    "name": "buy_price",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "buy_date": {
+                    "name": "buy_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "holding_start_date": {
+                    "name": "holding_start_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "holding_end_date": {
+                    "name": "holding_end_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "holding_days": {
+                    "name": "holding_days",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "total_days_in_month": {
+                    "name": "total_days_in_month",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "position_value": {
+                    "name": "position_value",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "monthly_brokerage_rate": {
+                    "name": "monthly_brokerage_rate",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 10
+                },
+                "daily_brokerage_rate": {
+                    "name": "daily_brokerage_rate",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "brokerage_amount": {
+                    "name": "brokerage_amount",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "is_sold_in_month": {
+                    "name": "is_sold_in_month",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
+                },
+                "sell_date": {
+                    "name": "sell_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "sell_price": {
+                    "name": "sell_price",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "sell_value": {
+                    "name": "sell_value",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "partial_sale_quantity": {
+                    "name": "partial_sale_quantity",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "calculation_formula": {
+                    "name": "calculation_formula",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "notes": {
+                    "name": "notes",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "brokerage_trade_idx": {
+                    "name": "brokerage_trade_idx",
+                    "columns": [
+                        "brokerage_id",
+                        "trade_id"
+                    ],
+                    "isUnique": false
+                }
+            },
+            "foreignKeys": {
+                "brokerage_details_brokerage_id_brokerages_id_fk": {
+                    "name": "brokerage_details_brokerage_id_brokerages_id_fk",
+                    "tableFrom": "brokerage_details",
+                    "tableTo": "brokerages",
+                    "columnsFrom": [
+                        "brokerage_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                },
+                "brokerage_details_trade_id_trades_id_fk": {
+                    "name": "brokerage_details_trade_id_trades_id_fk",
+                    "tableFrom": "brokerage_details",
+                    "tableTo": "trades",
+                    "columnsFrom": [
+                        "trade_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                }
+            },
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "brokerages": {
+            "name": "brokerages",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "client_id": {
+                    "name": "client_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "month": {
+                    "name": "month",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "year": {
+                    "name": "year",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "calculation_period": {
+                    "name": "calculation_period",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "brokerage_rate": {
+                    "name": "brokerage_rate",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 10
+                },
+                "total_days_in_month": {
+                    "name": "total_days_in_month",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "total_holding_value": {
+                    "name": "total_holding_value",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "total_holding_days": {
+                    "name": "total_holding_days",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "brokerage_amount": {
+                    "name": "brokerage_amount",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "is_paid": {
+                    "name": "is_paid",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
+                },
+                "paid_amount": {
+                    "name": "paid_amount",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false,
+                    "default": 0
+                },
+                "total_positions": {
+                    "name": "total_positions",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "calculated_at": {
+                    "name": "calculated_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "period_idx": {
+                    "name": "period_idx",
+                    "columns": [
+                        "calculation_period"
+                    ],
+                    "isUnique": false
+                },
+                "brokerages_client_id_calculation_period_unique": {
+                    "name": "brokerages_client_id_calculation_period_unique",
+                    "columns": [
+                        "client_id",
+                        "calculation_period"
+                    ],
+                    "isUnique": true
+                }
+            },
+            "foreignKeys": {
+                "brokerages_client_id_clients_id_fk": {
+                    "name": "brokerages_client_id_clients_id_fk",
+                    "tableFrom": "brokerages",
+                    "tableTo": "clients",
+                    "columnsFrom": [
+                        "client_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                }
+            },
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "clients": {
+            "name": "clients",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "name": {
+                    "name": "name",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "pan": {
+                    "name": "pan",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "email": {
+                    "name": "email",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "mobile": {
+                    "name": "mobile",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "address": {
+                    "name": "address",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "updated_at": {
+                    "name": "updated_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "clients_pan_unique": {
+                    "name": "clients_pan_unique",
+                    "columns": [
+                        "pan"
+                    ],
+                    "isUnique": true
+                },
+                "clients_email_unique": {
+                    "name": "clients_email_unique",
+                    "columns": [
+                        "email"
+                    ],
+                    "isUnique": true
+                },
+                "clients_mobile_unique": {
+                    "name": "clients_mobile_unique",
+                    "columns": [
+                        "mobile"
+                    ],
+                    "isUnique": true
+                }
+            },
+            "foreignKeys": {},
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "fifo_allocations": {
+            "name": "fifo_allocations",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "sell_trade_id": {
+                    "name": "sell_trade_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "buy_trade_id": {
+                    "name": "buy_trade_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "client_id": {
+                    "name": "client_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "symbol": {
+                    "name": "symbol",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "exchange": {
+                    "name": "exchange",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "quantity_allocated": {
+                    "name": "quantity_allocated",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "buy_price": {
+                    "name": "buy_price",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "sell_price": {
+                    "name": "sell_price",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "buy_date": {
+                    "name": "buy_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "sell_date": {
+                    "name": "sell_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "buy_value": {
+                    "name": "buy_value",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "sell_value": {
+                    "name": "sell_value",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "profit_loss": {
+                    "name": "profit_loss",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "holding_days": {
+                    "name": "holding_days",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "fifo_client_symbol_idx": {
+                    "name": "fifo_client_symbol_idx",
+                    "columns": [
+                        "client_id",
+                        "symbol",
+                        "exchange"
+                    ],
+                    "isUnique": false
+                },
+                "sell_trade_idx": {
+                    "name": "sell_trade_idx",
+                    "columns": [
+                        "sell_trade_id"
+                    ],
+                    "isUnique": false
+                },
+                "buy_trade_idx": {
+                    "name": "buy_trade_idx",
+                    "columns": [
+                        "buy_trade_id"
+                    ],
+                    "isUnique": false
+                }
+            },
+            "foreignKeys": {
+                "fifo_allocations_sell_trade_id_trades_id_fk": {
+                    "name": "fifo_allocations_sell_trade_id_trades_id_fk",
+                    "tableFrom": "fifo_allocations",
+                    "tableTo": "trades",
+                    "columnsFrom": [
+                        "sell_trade_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                },
+                "fifo_allocations_buy_trade_id_trades_id_fk": {
+                    "name": "fifo_allocations_buy_trade_id_trades_id_fk",
+                    "tableFrom": "fifo_allocations",
+                    "tableTo": "trades",
+                    "columnsFrom": [
+                        "buy_trade_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                }
+            },
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "payments": {
+            "name": "payments",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "client_id": {
+                    "name": "client_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "amount": {
+                    "name": "amount",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "payment_type": {
+                    "name": "payment_type",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": "'other'"
+                },
+                "description": {
+                    "name": "description",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "payment_date": {
+                    "name": "payment_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "brokerage_id": {
+                    "name": "brokerage_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "notes": {
+                    "name": "notes",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "payment_client_date_idx": {
+                    "name": "payment_client_date_idx",
+                    "columns": [
+                        "client_id",
+                        "payment_date"
+                    ],
+                    "isUnique": false
+                }
+            },
+            "foreignKeys": {
+                "payments_client_id_clients_id_fk": {
+                    "name": "payments_client_id_clients_id_fk",
+                    "tableFrom": "payments",
+                    "tableTo": "clients",
+                    "columnsFrom": [
+                        "client_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                }
+            },
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "positions": {
+            "name": "positions",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "client_id": {
+                    "name": "client_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "symbol": {
+                    "name": "symbol",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "exchange": {
+                    "name": "exchange",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "quantity": {
+                    "name": "quantity",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "average_price": {
+                    "name": "average_price",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "total_investment": {
+                    "name": "total_investment",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "first_purchase_date": {
+                    "name": "first_purchase_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "last_brokerage_month": {
+                    "name": "last_brokerage_month",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "updated_at": {
+                    "name": "updated_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "positions_client_id_symbol_exchange_unique": {
+                    "name": "positions_client_id_symbol_exchange_unique",
+                    "columns": [
+                        "client_id",
+                        "symbol",
+                        "exchange"
+                    ],
+                    "isUnique": true
+                }
+            },
+            "foreignKeys": {
+                "positions_client_id_clients_id_fk": {
+                    "name": "positions_client_id_clients_id_fk",
+                    "tableFrom": "positions",
+                    "tableTo": "clients",
+                    "columnsFrom": [
+                        "client_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                }
+            },
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "stocks": {
+            "name": "stocks",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "symbol": {
+                    "name": "symbol",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "name": {
+                    "name": "name",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "exchange": {
+                    "name": "exchange",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "sector": {
+                    "name": "sector",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "current_price": {
+                    "name": "current_price",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false,
+                    "default": 0
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "updated_at": {
+                    "name": "updated_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "stocks_symbol_exchange_unique": {
+                    "name": "stocks_symbol_exchange_unique",
+                    "columns": [
+                        "symbol",
+                        "exchange"
+                    ],
+                    "isUnique": true
+                }
+            },
+            "foreignKeys": {},
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
+        "trades": {
+            "name": "trades",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "client_id": {
+                    "name": "client_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "symbol": {
+                    "name": "symbol",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "exchange": {
+                    "name": "exchange",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "type": {
+                    "name": "type",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "quantity": {
+                    "name": "quantity",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "price": {
+                    "name": "price",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "trade_date": {
+                    "name": "trade_date",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "net_amount": {
+                    "name": "net_amount",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "original_quantity": {
+                    "name": "original_quantity",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "remaining_quantity": {
+                    "name": "remaining_quantity",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "is_fully_sold": {
+                    "name": "is_fully_sold",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
+                },
+                "sell_processed": {
+                    "name": "sell_processed",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
+                },
+                "last_brokerage_calculated": {
+                    "name": "last_brokerage_calculated",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "notes": {
+                    "name": "notes",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "updated_at": {
+                    "name": "updated_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "client_symbol_idx": {
+                    "name": "client_symbol_idx",
+                    "columns": [
+                        "client_id",
+                        "symbol",
+                        "exchange"
+                    ],
+                    "isUnique": false
+                },
+                "trade_date_idx": {
+                    "name": "trade_date_idx",
+                    "columns": [
+                        "trade_date"
+                    ],
+                    "isUnique": false
+                },
+                "fifo_idx": {
+                    "name": "fifo_idx",
+                    "columns": [
+                        "type",
+                        "is_fully_sold",
+                        "trade_date"
+                    ],
+                    "isUnique": false
+                }
+            },
+            "foreignKeys": {
+                "trades_client_id_clients_id_fk": {
+                    "name": "trades_client_id_clients_id_fk",
+                    "tableFrom": "trades",
+                    "tableTo": "clients",
+                    "columnsFrom": [
+                        "client_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "no action",
+                    "onUpdate": "no action"
+                }
+            },
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        }
+    },
+    "views": {},
+    "enums": {},
+    "_meta": {
+        "schemas": {},
+        "tables": {},
+        "columns": {}
+    },
+    "internal": {
+        "indexes": {}
+    }
+}

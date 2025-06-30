@@ -29,18 +29,64 @@ const MonthRangePicker: React.FC<MonthRangePickerProps> = ({ from, to, onChange 
     const [open, setOpen] = React.useState(false);
     const [year, setYear] = React.useState(new Date().getFullYear());
 
-    const [range, setRange] = React.useState<MonthRange>({
-        from: from ? new Date(from) : undefined,
-        to: to ? new Date(to) : undefined,
+    const [range, setRange] = React.useState<MonthRange>(() => {
+        const fromDate = from ? new Date(from) : undefined;
+        const toDate = to ? new Date(to) : undefined;
+
+        // Adjust initial from date to first day of month
+        const adjustedFromDate = fromDate
+            ? new Date(fromDate.getFullYear(), fromDate.getMonth(), 1)
+            : undefined;
+
+        // Adjust initial to date to last day of month
+        const adjustedToDate = toDate
+            ? new Date(toDate.getFullYear(), toDate.getMonth() + 1, 0)
+            : undefined;
+
+        return {
+            from: adjustedFromDate,
+            to: adjustedToDate,
+        };
     });
 
     const months = Array.from({ length: 12 }, (_, i) => new Date(year, i, 1));
 
+    // Handle single month selection
+    const handleSingleMonthSelection = (month: Date) => {
+        const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+        const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+        const newRange = { from: firstDay, to: lastDay };
+        setRange(newRange);
+        onChange(newRange);
+        setOpen(false);
+    };
+
     const handleMonthClick = (month: Date) => {
         if (!range.from || (range.from && range.to)) {
-            setRange({ from: month, to: undefined });
+            // When selecting first month, set date to first day of month
+            const firstDayOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+            setRange({ from: firstDayOfMonth, to: undefined });
+        } else if (range.from
+            && month.getFullYear() === range.from.getFullYear()
+            && month.getMonth() === range.from.getMonth()) {
+            // If clicking the same month that was already selected as the start,
+            // treat it as a single month selection
+            handleSingleMonthSelection(month);
         } else {
-            const newRange = month < range.from ? { from: month, to: range.from } : { from: range.from, to: month };
+            let fromDate = range.from;
+            let toDate: Date;
+
+            if (month < range.from) {
+                // If selecting earlier month as second click, swap and set days appropriately
+                fromDate = new Date(month.getFullYear(), month.getMonth(), 1); // First day of earlier month
+                toDate = new Date(range.from.getFullYear(), range.from.getMonth() + 1, 0); // Last day of later month
+            } else {
+                // Normal case - second month is after first month
+                fromDate = new Date(range.from.getFullYear(), range.from.getMonth(), 1); // First day of first month
+                toDate = new Date(month.getFullYear(), month.getMonth() + 1, 0); // Last day of last month
+            }
+
+            const newRange = { from: fromDate, to: toDate };
             setRange(newRange);
             onChange(newRange);
             setOpen(false);
@@ -83,12 +129,12 @@ const MonthRangePicker: React.FC<MonthRangePickerProps> = ({ from, to, onChange 
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
-                    className="w-full justify-between font-normal h-10 lg:h-12 px-4 py-2 border-border bg-transparent rounded-xl"
+                    className="justify-between font-normal h-10 lg:h-12 px-4 py-2 border-border bg-transparent rounded-xl"
                 >
                     <span className="text-xs">
                         {range.from
                             ? range.to
-                                ? `${format(range.from, "MMM yyyy")} - ${format(range.to, "MMM yyyy")}`
+                                ? `${format(range.from, "MMM d, yyyy")} - ${format(range.to, "MMM d, yyyy")}`
                                 : format(range.from, "MMM yyyy")
                             : "Select Month Range"}
                     </span>

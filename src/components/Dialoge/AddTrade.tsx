@@ -2,12 +2,19 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DialogTrigger } from "@radix-ui/react-dialog";
-import React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+import { z } from "zod";
 
-import type { AddTradeField } from "@/types/trade";
+import type { ClientDropdownItem } from "@/types/client";
+import type { CreateTradeRequest, Trade, UpdateTradeRequest } from "@/types/trade";
 
+import { getAllClientsForDropdown } from "@/api/client";
+import { createTrade, formatDateForTradeApi, getStockSymbols, getTradeById, updateTrade } from "@/api/trades";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -20,41 +27,381 @@ import {
     FormControl,
     FormField,
     FormItem,
+    FormLabel,
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { TYPE } from "@/lib/constants";
-import { addTradeSchema } from "@/types/trade";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import DatePicker from "../ui/datePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type AddTradeProps = {
     name?: string;
+    onSuccess?: () => void;
+    clientId?: number;
+    editTradeId?: number;
 };
 
+// Improved trade schema with proper validations
+const tradeSchema = z.object({
+    clientId: z.number().int().positive({ message: "Please select a valid client" }),
+    symbol: z.string().min(1, { message: "Stock symbol is required" }),
+    exchange: z.enum(["NSE", "BSE"], { message: "Please select an exchange" }),
+    tradeType: z.enum(["BUY", "SELL"], { message: "Please select a trade type" }),
+    quantity: z.number().int().positive({ message: "Quantity must be a positive number" }),
+    price: z.number().positive({ message: "Price per share must be a positive number" }),
+    tradeDate: z.string().min(1, { message: "Please select a date" }),
+    notes: z.string().optional(),
+    status: z.enum(["PENDING", "COMPLETED", "CANCELLED"]).default("COMPLETED").optional(),
+});
+
+type TradeFormValues = z.infer<typeof tradeSchema>;
+
 const AddTrade: React.FC<AddTradeProps> = ({
-    name,
+    name = "Add Trade",
+    onSuccess,
+    clientId,
+    editTradeId,
 }) => {
-    const addTradeForm = useForm<AddTradeField>({
+    const [open, setOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [openStockPopover, setOpenStockPopover] = useState(false);
+    const [openClientPopover, setOpenClientPopover] = useState(false);
+    const [clientSearchTerm, setClientSearchTerm] = useState("");
+    const queryClient = useQueryClient();
+    const isEditMode = Boolean(editTradeId);
+
+    // Initialize form with default values
+    const tradeForm = useForm<TradeFormValues>({
         defaultValues: {
-            client: "",
-            trade: "",
-            stock: "",
-            quantity: "",
-            date: "",
-            pricePerShare: 0,
+            clientId: clientId || undefined,
+            symbol: "",
+            exchange: undefined,
+            tradeType: undefined,
+            quantity: undefined,
+            price: undefined,
+            tradeDate: "",
+            notes: "",
         },
-        resolver: zodResolver(addTradeSchema),
+        resolver: zodResolver(tradeSchema),
         mode: "onSubmit",
     });
 
-    const onSubmit = async (data: AddTradeField) => {
-        console.log(data);
+    // Fetch clients for dropdown
+    const { data: clientsDropdown = [], isLoading: loadingClients } = useQuery({
+        queryKey: ["clientsDropdown"],
+        queryFn: getAllClientsForDropdown,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
+    });
+
+    // Fetch stock symbols
+    const { data: stockSymbols, isLoading: loadingStocks, error: stockError } = useQuery({
+        queryKey: ["stockSymbols"],
+        queryFn: async () => {
+            try {
+                const result = await getStockSymbols();
+
+                if (!result || (typeof result !== "object")) {
+                    console.error("Invalid stock symbols response format:", result);
+                    throw new Error("Failed to fetch stock symbols: Invalid response format");
+                }
+
+                return result;
+            } catch (error) {
+                console.error("Error fetching stock symbols:", error);
+                throw error;
+            }
+        },
+        staleTime: 5 * 60 * 1000,
+        retry: (failureCount, error: any) => {
+            if (failureCount < 2 && error.message && !error.message.includes("Invalid response format")) {
+                return true;
+            }
+            return false;
+        },
+        refetchOnWindowFocus: false,
+    });
+
+    // Fetch trade details if in edit mode
+    const { data: tradeDetails, isLoading: loadingTradeDetails } = useQuery({
+        queryKey: ["trade", editTradeId],
+        queryFn: () => editTradeId
+            ? getTradeById(editTradeId)
+            : null,
+        enabled: isEditMode,
+    });
+
+    // Update form when trade details are loaded
+    useEffect(() => {
+        if (isEditMode && tradeDetails) {
+            // Ensure we have a valid exchange value (NSE or BSE)
+            const exchange = (tradeDetails.exchange === "BSE")
+                ? "BSE" as const
+                : "NSE" as const;
+
+            // //console.log(`Loading trade details with exchange: ${exchange} (original: ${tradeDetails.exchange})`);
+
+            tradeForm.reset({
+                clientId: tradeDetails.clientId,
+                symbol: tradeDetails.symbol,
+                exchange,
+                tradeType: tradeDetails.type,
+                quantity: tradeDetails.quantity,
+                price: tradeDetails.price,
+                tradeDate: tradeDetails.tradeDate.toString(),
+                notes: tradeDetails.notes || "",
+                status: tradeDetails.status,
+            });
+        }
+    }, [tradeDetails, isEditMode, tradeForm]);
+
+    // Format stock symbols for dropdown
+    const formattedStocks = React.useMemo(() => {
+        if (!stockSymbols)
+            return [];
+
+        try {
+            const result = [];
+            const nseArray = stockSymbols.nse || [];
+            const bseArray = stockSymbols.bse || [];
+
+            // //console.log(nseArray, bseArray);
+
+            // Format NSE stocks
+            if (Array.isArray(nseArray) && nseArray.length > 0) {
+                const nseStocks = nseArray.map(symbol => ({
+                    label: `${symbol}-NSE`,
+                    value: symbol,
+                    exchange: "NSE" as const,
+                }));
+                result.push(...nseStocks);
+            }
+
+            // Format BSE stocks
+            if (Array.isArray(bseArray) && bseArray.length > 0) {
+                const bseStocks = bseArray.map(symbol => ({
+                    label: `${symbol}-BSE`,
+                    value: symbol,
+                    exchange: "BSE" as const,
+                }));
+                result.push(...bseStocks);
+            }
+
+            // If no stocks are available, provide hardcoded examples for development
+            if (result.length === 0) {
+                console.warn("No stocks found. Using example stocks for development");
+                return [
+                    { label: "RELIANCE-NSE", value: "RELIANCE", exchange: "NSE" as const },
+                    { label: "TCS-NSE", value: "TCS", exchange: "NSE" as const },
+                    { label: "HDFC-NSE", value: "HDFC", exchange: "NSE" as const },
+                    { label: "TATASTEEL-BSE", value: "TATASTEEL", exchange: "BSE" as const },
+                    { label: "INFY-BSE", value: "INFY", exchange: "BSE" as const },
+                ];
+            }
+
+            return result;
+        } catch (error) {
+            console.error("Error formatting stock symbols:", error);
+
+            return [
+                { label: "RELIANCE-NSE", value: "RELIANCE", exchange: "NSE" as const },
+                { label: "TCS-NSE", value: "TCS", exchange: "NSE" as const },
+                { label: "HDFC-BSE", value: "HDFC", exchange: "BSE" as const },
+            ];
+        }
+    }, [stockSymbols]);
+
+    const filteredClients = React.useMemo(() => {
+        if (!clientSearchTerm || !clientsDropdown)
+            return clientsDropdown;
+
+        return clientsDropdown.filter(client =>
+            client.name.toLowerCase().includes(clientSearchTerm.toLowerCase())
+            || client.id.toString().includes(clientSearchTerm),
+        );
+    }, [clientsDropdown, clientSearchTerm]);
+
+    const filteredStocks = React.useMemo(() => {
+        if (!searchTerm)
+            return formattedStocks;
+        return formattedStocks.filter(stock =>
+            stock.label.toLowerCase().includes(searchTerm.toLowerCase()),
+        );
+    }, [formattedStocks, searchTerm]);
+
+    // Create trade mutation
+    const createTradeMutation = useMutation({
+        mutationFn: createTrade,
+        onSuccess: (response: { data: Trade; message: string }) => {
+            // Use the success message from the API response
+            toast.success(response.message || "Trade created successfully");
+            queryClient.invalidateQueries({ queryKey: ["trades"] });
+            queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
+            tradeForm.reset();
+            setOpen(false);
+            if (onSuccess)
+                onSuccess();
+        },
+        onError: (error: any) => {
+            console.error("Trade creation error:", error);
+            if (error.message
+                && !error.message.includes("Request failed with status code")
+                && !error.message.includes("Failed to create trade")) {
+                toast.error(error.message, {
+                    duration: 7000,
+                    icon: "⚠️",
+                    style: {
+                        border: "1px solid #f43f5e",
+                        padding: "16px",
+                        color: "#f43f5e",
+                    },
+                });
+                return;
+            }
+
+            if (!error.message || error.message.includes("Request failed with status code")) {
+                toast.error("Failed to create trade. Please try again.", {
+                    duration: 3000,
+                });
+            } else {
+                toast.error(error.message, { duration: 5000 });
+            }
+
+            if (error.error?.issues) {
+                error.error.issues.forEach((issue: any) => {
+                    toast.error(`${issue.path}: ${issue.message}`, {
+                        duration: 5000,
+                    });
+                });
+            }
+        },
+    });
+
+    const onSubmit = async (data: TradeFormValues) => {
+        // Prepare the trade date
+        const formattedTradeDate = formatDateForTradeApi(new Date(data.tradeDate)) || new Date().toISOString().split("T")[0];
+
+        if (isEditMode && editTradeId) {
+            // Handle update
+            const updateRequest: UpdateTradeRequest = {
+                id: editTradeId,
+                clientId: data.clientId,
+                symbol: data.symbol,
+                exchange: data.exchange,
+                type: data.tradeType,
+                quantity: data.quantity,
+                price: data.price,
+                tradeDate: formattedTradeDate,
+                notes: data.notes || "",
+            };
+
+            // //console.log("Sending update request:", JSON.stringify(updateRequest, null, 2));
+
+            try {
+                const response = await updateTrade(editTradeId, updateRequest);
+                toast.success(response.message || "Trade updated successfully");
+                queryClient.invalidateQueries({ queryKey: ["trades"] });
+                queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
+                tradeForm.reset();
+                setOpen(false);
+                if (onSuccess)
+                    onSuccess();
+            } catch (error: any) {
+                console.error("Trade update error:", error);
+
+                if (error.message
+                    && !error.message.includes("Request failed with status code")
+                    && !error.message.includes("Failed to update trade")) {
+                    toast.error(error.message, {
+                        duration: 7000,
+                        icon: "⚠️",
+                        style: {
+                            border: "1px solid #f43f5e",
+                            padding: "16px",
+                            color: "#f43f5e",
+                        },
+                    });
+                    return;
+                }
+
+                if (!error.message || error.message.includes("Request failed with status code")) {
+                    toast.error("Failed to update trade. Please try again.", {
+                        duration: 3000,
+                    });
+                } else {
+                    toast.error(error.message, { duration: 5000 });
+                }
+
+                if (error.error?.issues) {
+                    error.error.issues.forEach((issue: any) => {
+                        toast.error(`${issue.path}: ${issue.message}`, {
+                            duration: 5000,
+                        });
+                    });
+                }
+            }
+        } else {
+            const createRequest: CreateTradeRequest = {
+                clientId: data.clientId,
+                symbol: data.symbol,
+                exchange: data.exchange,
+                type: data.tradeType,
+                quantity: data.quantity,
+                price: data.price,
+                tradeDate: formattedTradeDate,
+                notes: data.notes || "",
+            };
+
+            // //console.log("Sending create request:", JSON.stringify(createRequest, null, 2));
+
+            createTradeMutation.mutate(createRequest);
+        }
     };
 
+    const calculateTotalValue = () => {
+        const quantity = tradeForm.watch("quantity");
+        const price = tradeForm.watch("price");
+
+        if (quantity && price) {
+            return quantity * price;
+        }
+        return 0;
+    };
+
+    useEffect(() => {
+        if (!loadingStocks && (!stockSymbols
+            || typeof stockSymbols !== "object"
+            || (!Array.isArray(stockSymbols.nse) && !Array.isArray(stockSymbols.bse)))) {
+            queryClient.invalidateQueries({ queryKey: ["stockSymbols"] });
+        }
+    }, [stockSymbols, loadingStocks, queryClient]);
+
+    useEffect(() => {
+        if (open) {
+            if (!loadingStocks && formattedStocks.length === 0
+                && (!stockSymbols || typeof stockSymbols !== "object"
+                    || (!Array.isArray(stockSymbols.nse) && !Array.isArray(stockSymbols.bse)))) {
+                queryClient.invalidateQueries({ queryKey: ["stockSymbols"] });
+            }
+        }
+    }, [open, formattedStocks.length, loadingStocks, queryClient, stockSymbols]);
+
+    const totalValue = calculateTotalValue();
+
+    // print form values changes
+    // useEffect(() => {
+    //     const subscription = tradeForm.watch((value, { name, type }) => {
+    //         //console.log(`Form value changed: ${name} (${type})`, value);
+    //     });
+
+    //     return () => subscription.unsubscribe();
+    // }, [tradeForm]);
+
     return (
-        <Dialog>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button className="ml-auto bg-primary px-5 md:px-8 rounded-xl">
                     +
@@ -65,157 +412,624 @@ const AddTrade: React.FC<AddTradeProps> = ({
 
                 <DialogHeader>
                     <DialogTitle className="text-xl font-medium">
-                        Add Trade
+                        {isEditMode
+                            ? "Edit Trade"
+                            : "Add Trade"}
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="max-h-[calc(100vh-220px)] overflow-y-scroll">
-                    <Form {...addTradeForm}>
-                        <form className="flex flex-col gap-4">
-                            <div className="flex flex-col md:flex-row w-full gap-4 items-center">
-                                <div className="w-full">
-                                    <FormField
-                                        control={addTradeForm.control}
-                                        name="client"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormControl>
-                                                    <Input
-                                                        placeholder="Client Name"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
+                <ScrollArea className="max-h-[calc(100vh-220px)]">
+                    <div className="px-2">
+                        {(isEditMode && loadingTradeDetails)
 
-                                <div className="w-full px-1">
-                                    <FormField
-                                        control={addTradeForm.control}
-                                        name="trade"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormControl>
-                                                    <Select value={field.value} onValueChange={field.onChange}>
-                                                        <SelectTrigger className="w-full ring-0 bg-secondary border-none rounded-lg h-11">
-                                                            <SelectValue placeholder="Type" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {TYPE.map(item => (
-                                                                <SelectItem
-                                                                    className="cursor-pointer"
-                                                                    key={item}
-                                                                    value={item}
+                            ? (
+                                    <div className="flex justify-center p-4">Loading trade details...</div>
+                                )
+
+                            : (
+                                    <Form {...tradeForm}>
+                                        <form className="flex flex-col gap-4">
+                                            <div className="flex flex-col md:flex-row w-full gap-4 items-center">
+                                                <div className="w-full">
+                                                    <FormField
+                                                        control={tradeForm.control}
+                                                        name="clientId"
+                                                        render={({ field }) => (
+                                                            <FormItem className="flex flex-col">
+                                                                <FormLabel>Client</FormLabel>
+                                                                <Popover open={openClientPopover} onOpenChange={setOpenClientPopover}>
+                                                                    <PopoverTrigger asChild>
+                                                                        <FormControl>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                role="combobox"
+                                                                                className="w-full justify-between"
+                                                                                disabled={Boolean(clientId) || isEditMode}
+                                                                                aria-expanded={openClientPopover}
+                                                                                type="button"
+                                                                            >
+                                                                                {field.value && clientsDropdown
+
+                                                                                    ? clientsDropdown.find(client => client.id === field.value)?.name || "Select client"
+
+                                                                                    : "Select client"}
+                                                                                <i className={`fa fa-chevron-${openClientPopover
+                                                                                    ? "up"
+                                                                                    : "down"}`}
+                                                                                />
+                                                                            </Button>
+                                                                        </FormControl>
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent className="w-[300px] p-2" style={{ maxHeight: "calc(100vh - 100px)", overflow: "visible" }}>
+                                                                        <div className="space-y-2">
+                                                                            <Input
+                                                                                placeholder="Search client or enter ID..."
+                                                                                className="h-9"
+                                                                                value={clientSearchTerm}
+                                                                                onChange={e => setClientSearchTerm(e.target.value)}
+                                                                                onKeyDown={(e) => {
+                                                                                // Allow directly entering client ID by pressing Enter
+                                                                                    if (e.key === "Enter" && clientSearchTerm.trim() !== "") {
+                                                                                        e.preventDefault();
+                                                                                        const clientId = Number.parseInt(clientSearchTerm.trim());
+                                                                                        // Check if it's a valid number
+                                                                                        if (!Number.isNaN(clientId) && clientId > 0) {
+                                                                                            tradeForm.setValue("clientId", clientId);
+                                                                                            setOpenClientPopover(false);
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                            />
+
+                                                                            {filteredClients.length === 0 && (
+                                                                                <Card className="border border-gray-200">
+                                                                                    <CardContent className="p-2">
+                                                                                        <div className="text-sm">No client found.</div>
+                                                                                        {!Number.isNaN(Number.parseInt(clientSearchTerm.trim())) && Number.parseInt(clientSearchTerm.trim()) > 0 && (
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="outline"
+                                                                                                className="mt-2 text-xs"
+                                                                                                onClick={() => {
+                                                                                                    const clientId = Number.parseInt(clientSearchTerm.trim());
+                                                                                                    tradeForm.setValue("clientId", clientId);
+                                                                                                    setOpenClientPopover(false);
+                                                                                                }}
+                                                                                            >
+                                                                                                Use ID:
+                                                                                                {" "}
+                                                                                                {clientSearchTerm.trim()}
+                                                                                            </Button>
+                                                                                        )}
+                                                                                    </CardContent>
+                                                                                </Card>
+                                                                            )}
+
+                                                                            <ScrollArea className="h-64 overflow-hidden border rounded-md" style={{ display: "block" }}>
+                                                                                <div className="p-2 pb-3">
+                                                                                    {loadingClients
+
+                                                                                        ? (
+                                                                                                <div className="p-2 text-center text-sm">Loading clients...</div>
+                                                                                            )
+
+                                                                                        : filteredClients?.length > 0 && (
+                                                                                            <div className="space-y-1">
+                                                                                                {filteredClients.map((client: ClientDropdownItem) => (
+                                                                                                    <Button
+                                                                                                        key={client.id}
+                                                                                                        variant="ghost"
+                                                                                                        className="w-full justify-start text-left hover:bg-secondary cursor-pointer"
+                                                                                                        onClick={() => {
+                                                                                                            tradeForm.setValue("clientId", client.id);
+                                                                                                            setOpenClientPopover(false);
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        {client.name}
+                                                                                                        {" "}
+                                                                                                        (ID:
+                                                                                                        {client.id}
+                                                                                                        )
+                                                                                                    </Button>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        )}
+                                                                                </div>
+                                                                            </ScrollArea>
+                                                                        </div>
+                                                                    </PopoverContent>
+                                                                </Popover>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </div>
+
+                                                <div className="w-full px-1">
+                                                    <FormField
+                                                        control={tradeForm.control}
+                                                        name="tradeType"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel>Trade Type</FormLabel>
+                                                                <FormControl>
+                                                                    <Select
+                                                                        value={field.value}
+                                                                        onValueChange={(value: "BUY" | "SELL") => field.onChange(value)}
+                                                                    >
+                                                                        <SelectTrigger className="w-full ring-0 bg-secondary border-none rounded-lg h-11">
+                                                                            <SelectValue placeholder="Select Type" />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="BUY">Buy</SelectItem>
+                                                                            <SelectItem value="SELL">Sell</SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </FormControl>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col md:flex-row w-full gap-4">
+                                                <div className="w-full">
+                                                    {/* Stock Symbol with Search */}
+                                                    <FormField
+                                                        control={tradeForm.control}
+                                                        name="symbol"
+                                                        render={({ field }) => (
+                                                            <FormItem className="flex flex-col">
+                                                                <FormLabel>Stock Symbol</FormLabel>
+                                                                <Popover
+                                                                    open={openStockPopover}
+                                                                    onOpenChange={setOpenStockPopover}
                                                                 >
-                                                                    {item}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
+                                                                    <PopoverTrigger asChild>
+                                                                        <FormControl>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                role="combobox"
+                                                                                className="w-full justify-between h-11 bg-secondary border-none rounded-lg"
+                                                                                disabled={loadingStocks}
+                                                                                type="button"
+                                                                            >
+                                                                                <div className="flex justify-between w-full">
+                                                                                    <span>
+                                                                                        {loadingStocks
 
-                            <div className="flex flex-col md:flex-row w-full gap-4">
-                                <div className="w-full">
-                                    <FormField
-                                        control={addTradeForm.control}
-                                        name="stock"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormControl>
-                                                    <Input
-                                                        placeholder="Stock"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                                <div className="w-full">
-                                    <FormField
-                                        control={addTradeForm.control}
-                                        name="quantity"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormControl>
-                                                    <Input
-                                                        placeholder="Quantity"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
+                                                                                            ? (
+                                                                                                    <span className="flex items-center gap-2">
+                                                                                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                                                        </svg>
+                                                                                                        Loading symbols...
+                                                                                                    </span>
+                                                                                                )
 
-                            <div className="flex flex-col md:flex-row w-full gap-4 items-center">
-                                <div className="w-full px-1">
-                                    <FormField
-                                        control={addTradeForm.control}
-                                        name="date"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormControl>
-                                                    <DatePicker
-                                                        placeholder="Date"
-                                                        className="w-full bg-secondary hover:bg-secondary h-11"
-                                                        selected={field.value ? new Date(field.value) : undefined}
-                                                        onSelect={(date) => {
-                                                            if (date) {
-                                                                field.onChange(date.toISOString());
-                                                            }
-                                                        }}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                                <div className="w-full">
-                                    <FormField
-                                        control={addTradeForm.control}
-                                        name="pricePerShare"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormControl>
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="Price Per Share"
-                                                        {...field ?? undefined}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
+                                                                                            : (field.value
+                                                                                                // Display the selected stock with exchange suffix
 
-                            </div>
+                                                                                                    ? (() => {
+                                                                                                            // Always use the current exchange value from the form
+                                                                                                            const currentExchange = tradeForm.watch("exchange");
 
-                        </form>
-                    </Form>
-                </div>
+                                                                                                            // Check if we have this stock in our pre-formatted list
+                                                                                                            const foundStock = formattedStocks.find(stock =>
+                                                                                                                stock.value === field.value && stock.exchange === currentExchange,
+                                                                                                            );
+
+                                                                                                            // If found in the list with matching exchange, return its label
+                                                                                                            if (foundStock) {
+                                                                                                                return foundStock.label;
+                                                                                                            }
+
+                                                                                                            // Otherwise, build the label from current form values
+                                                                                                            // This ensures the displayed exchange always matches what's selected
+                                                                                                            if (field.value && currentExchange) {
+                                                                                                                return `${field.value}-${currentExchange}`;
+                                                                                                            }
+
+                                                                                                            // If we don't have the exchange but have the value, just show the symbol
+                                                                                                            return field.value
+                                                                                                                ? field.value
+                                                                                                                : "Select stock symbol";
+                                                                                                        })()
+
+                                                                                                    : "Select stock symbol")}
+                                                                                    </span>
+                                                                                    {loadingStocks
+
+                                                                                        ? (
+                                                                                                <span className="animate-spin mr-1">⟳</span>
+                                                                                            )
+
+                                                                                        : (
+                                                                                                <i className={`fa fa-chevron-${openStockPopover
+                                                                                                    ? "up"
+                                                                                                    : "down"}`}
+                                                                                                />
+                                                                                            )}
+                                                                                </div>
+                                                                            </Button>
+                                                                        </FormControl>
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent className="w-[300px] p-2" style={{ maxHeight: "calc(100vh - 100px)", overflow: "visible" }}>
+                                                                        <div className="space-y-2">
+                                                                            <Input
+                                                                                placeholder="Search or type stock symbol..."
+                                                                                className="h-9"
+                                                                                value={searchTerm}
+                                                                                onChange={e => setSearchTerm(e.target.value)}
+                                                                                onKeyDown={(e) => {
+                                                                                // Allow directly entering stock symbol by pressing Enter
+                                                                                    if (e.key === "Enter" && searchTerm.trim() !== "") {
+                                                                                        e.preventDefault();
+                                                                                        const cleanSymbol = searchTerm.trim().replace(/-NSE|-BSE/i, "");
+
+                                                                                        // Determine the exchange more accurately - look for BSE indicators
+                                                                                        const hasBseIndicator
+                                                                                        = searchTerm.toUpperCase().includes("-BSE")
+                                                                                            || searchTerm.toUpperCase().endsWith("BSE")
+                                                                                            || searchTerm.toLowerCase() === "bse"
+                                                                                            || searchTerm.toLowerCase().includes(" bse");
+
+                                                                                        const exchange = hasBseIndicator
+                                                                                            ? "BSE" as const
+                                                                                            : "NSE" as const;
+
+                                                                                        // //console.log(`Setting symbol: ${cleanSymbol}, exchange: ${exchange} from keyboard`);
+
+                                                                                        // Set values in form - set exchange first for consistent UI updates
+                                                                                        tradeForm.setValue("exchange", exchange);
+                                                                                        tradeForm.setValue("symbol", cleanSymbol);
+
+                                                                                        setOpenStockPopover(false);
+                                                                                    }
+                                                                                }}
+                                                                            />
+
+                                                                            {/* Show "Use as symbol" button if there's a search term */}
+                                                                            {searchTerm.trim() !== "" && (
+                                                                                <Card className="border border-gray-200 mb-2">
+                                                                                    <CardContent className="p-2">
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            variant="outline"
+                                                                                            className="text-xs w-full"
+                                                                                            onClick={() => {
+                                                                                                const cleanSymbol = searchTerm.trim().replace(/-NSE|-BSE/i, "");
+
+                                                                                                // Determine the exchange more accurately - look for BSE indicators
+                                                                                                const hasBseIndicator
+                                                                                                = searchTerm.toUpperCase().includes("-BSE")
+                                                                                                    || searchTerm.toUpperCase().endsWith("BSE")
+                                                                                                    || searchTerm.toLowerCase() === "bse"
+                                                                                                    || searchTerm.toLowerCase().includes(" bse");
+
+                                                                                                const exchange = hasBseIndicator
+                                                                                                    ? "BSE" as const
+                                                                                                    : "NSE" as const;
+
+                                                                                                // //console.log(`Setting symbol: ${cleanSymbol}, exchange: ${exchange} from button`);
+
+                                                                                                // Set exchange first, then symbol - this order is important for consistent UI updates
+                                                                                                tradeForm.setValue("exchange", exchange);
+                                                                                                tradeForm.setValue("symbol", cleanSymbol);
+
+                                                                                                // Verify the form state after setting values
+                                                                                                // setTimeout(() => {
+                                                                                                //     //console.log("Updated form state from button:", {
+                                                                                                //         symbol: tradeForm.getValues("symbol"),
+                                                                                                //         exchange: tradeForm.getValues("exchange")
+                                                                                                //     });
+                                                                                                // }, 0);
+                                                                                                setOpenStockPopover(false);
+                                                                                            }}
+                                                                                        >
+                                                                                            Use "
+                                                                                            {searchTerm}
+                                                                                            " as symbol
+                                                                                        </Button>
+                                                                                    </CardContent>
+                                                                                </Card>
+                                                                            )}
+
+                                                                            {/* Error handling */}
+                                                                            {stockError && (
+                                                                                <Card className="border border-red-200 mb-2">
+                                                                                    <CardContent className="p-2">
+                                                                                        <div className="text-sm text-red-500">Error loading stocks</div>
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            variant="outline"
+                                                                                            className="mt-2 text-xs w-full"
+                                                                                            onClick={() => {
+                                                                                                queryClient.invalidateQueries({ queryKey: ["stockSymbols"] });
+                                                                                            }}
+                                                                                        >
+                                                                                            Retry loading
+                                                                                        </Button>
+                                                                                    </CardContent>
+                                                                                </Card>
+                                                                            )}
+
+                                                                            <ScrollArea className="h-64 overflow-hidden border rounded-md" style={{ display: "block" }}>
+                                                                                <div className="p-2 pb-3">
+                                                                                    {loadingStocks
+                                                                                        ? (
+                                                                                                <div className="flex items-center justify-center p-4 gap-2 text-sm">
+                                                                                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                                                    </svg>
+                                                                                                    <span>Loading stock symbols...</span>
+                                                                                                </div>
+                                                                                            )
+
+                                                                                        : filteredStocks.length === 0 && !stockError
+
+                                                                                            ? (
+                                                                                                    <div className="p-2 text-center text-sm">
+                                                                                                        <p>No matching stocks found.</p>
+                                                                                                        {searchTerm.trim() !== "" && (
+                                                                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                                                                Press Enter to use "
+                                                                                                                {searchTerm}
+                                                                                                                " as a custom symbol.
+                                                                                                            </p>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                )
+                                                                                            : (
+                                                                                                    <div className="space-y-2">
+                                                                                                        {/* NSE Stocks */}
+                                                                                                        {filteredStocks.filter(stock => stock.exchange === "NSE").length > 0 && (
+                                                                                                            <>
+                                                                                                                <div className="px-2 py-1 text-xs font-semibold bg-muted/50 rounded flex items-center justify-between">
+                                                                                                                    <span>NSE</span>
+                                                                                                                    <span className="text-xs text-gray-500">
+                                                                                                                        {filteredStocks.filter(stock => stock.exchange === "NSE").length}
+                                                                                                                        {" "}
+                                                                                                                        stocks
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                                <div className="space-y-1">
+                                                                                                                    {filteredStocks
+                                                                                                                        .filter(stock => stock.exchange === "NSE")
+                                                                                                                        .map(stock => (
+                                                                                                                            <Button
+                                                                                                                                key={stock.label}
+                                                                                                                                variant="ghost"
+                                                                                                                                className="w-full justify-start text-left hover:bg-secondary cursor-pointer"
+                                                                                                                                onClick={() => {
+                                                                                                                                    // Log before setting values
+                                                                                                                                    // //console.log(`Selecting stock: ${stock.value}, exchange: NSE, label: ${stock.label}`);
+
+                                                                                                                                    // Set exchange first, then symbol - this order is important for consistent UI updates
+                                                                                                                                    tradeForm.setValue("exchange", "NSE" as const);
+                                                                                                                                    tradeForm.setValue("symbol", stock.value);
+
+                                                                                                                                    // Verify the form state after setting values
+                                                                                                                                    // setTimeout(() => {
+                                                                                                                                    //     //console.log("Updated form state:", {
+                                                                                                                                    //         symbol: tradeForm.getValues("symbol"),
+                                                                                                                                    //         exchange: tradeForm.getValues("exchange")
+                                                                                                                                    //     });
+                                                                                                                                    // }, 0);
+
+                                                                                                                                    setOpenStockPopover(false);
+                                                                                                                                }}
+                                                                                                                            >
+                                                                                                                                {stock.label}
+                                                                                                                            </Button>
+                                                                                                                        ))}
+                                                                                                                </div>
+                                                                                                            </>
+                                                                                                        )}
+
+                                                                                                        {/* BSE Stocks */}
+                                                                                                        {filteredStocks.filter(stock => stock.exchange === "BSE").length > 0 && (
+                                                                                                            <>
+                                                                                                                <div className="px-2 py-1 text-xs font-semibold bg-muted/50 rounded flex items-center justify-between">
+                                                                                                                    <span>BSE</span>
+                                                                                                                    <span className="text-xs text-gray-500">
+                                                                                                                        {filteredStocks.filter(stock => stock.exchange === "BSE").length}
+                                                                                                                        {" "}
+                                                                                                                        stocks
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                                <div className="space-y-1">
+                                                                                                                    {filteredStocks
+                                                                                                                        .filter(stock => stock.exchange === "BSE")
+                                                                                                                        .map(stock => (
+                                                                                                                            <Button
+                                                                                                                                key={stock.label}
+                                                                                                                                variant="ghost"
+                                                                                                                                className="w-full justify-start text-left hover:bg-secondary cursor-pointer"
+                                                                                                                                onClick={() => {
+                                                                                                                                    // Log before setting values
+                                                                                                                                    // //console.log(`Selecting stock: ${stock.value}, exchange: BSE, label: ${stock.label}`);
+
+                                                                                                                                    // Set exchange first, then symbol - this order is important for consistent UI updates
+                                                                                                                                    tradeForm.setValue("exchange", "BSE" as const);
+                                                                                                                                    tradeForm.setValue("symbol", stock.value);
+
+                                                                                                                                    // Verify the form state after setting values
+                                                                                                                                    // setTimeout(() => {
+                                                                                                                                    //     //console.log("Updated form state:", {
+                                                                                                                                    //         symbol: tradeForm.getValues("symbol"),
+                                                                                                                                    //         exchange: tradeForm.getValues("exchange")
+                                                                                                                                    //     });
+                                                                                                                                    // }, 0);
+
+                                                                                                                                    setOpenStockPopover(false);
+                                                                                                                                }}
+                                                                                                                            >
+                                                                                                                                {stock.label}
+                                                                                                                            </Button>
+                                                                                                                        ))}
+                                                                                                                </div>
+                                                                                                            </>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                </div>
+                                                                            </ScrollArea>
+                                                                        </div>
+                                                                    </PopoverContent>
+                                                                </Popover>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="w-full">
+                                                    <FormField
+                                                        control={tradeForm.control}
+                                                        name="quantity"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel>Quantity</FormLabel>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        type="number"
+                                                                        placeholder="Quantity"
+                                                                        {...field}
+                                                                        value={field.value === undefined ? "" : field.value}
+                                                                        onChange={(e) => {
+                                                                            const value = e.target.value === "" ? undefined : Number(e.target.value);
+                                                                            field.onChange(value);
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col md:flex-row w-full gap-4 items-center">
+                                                <div className="w-full px-1">
+                                                    <FormField
+                                                        control={tradeForm.control}
+                                                        name="tradeDate"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel>Date</FormLabel>
+                                                                <FormControl>
+                                                                    <DatePicker
+                                                                        placeholder="Select Date"
+                                                                        className="w-full bg-secondary hover:bg-secondary h-11"
+                                                                        selected={field.value
+                                                                            ? new Date(field.value)
+                                                                            : undefined}
+                                                                        onSelect={(date) => {
+                                                                            if (date) {
+                                                                                field.onChange(date.toISOString());
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="w-full">
+                                                    <FormField
+                                                        control={tradeForm.control}
+                                                        name="price"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel>Price Per Share</FormLabel>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        type="number"
+                                                                        placeholder="Price"
+                                                                        step="0.01"
+                                                                        {...field}
+                                                                        value={field.value === undefined ? "" : field.value}
+                                                                        onChange={(e) => {
+                                                                            const value = e.target.value === "" ? undefined : Number(e.target.value);
+                                                                            field.onChange(value);
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Total trade value calculation */}
+                                            {(tradeForm.watch("quantity") && tradeForm.watch("price"))
+
+                                                ? (
+                                                        <div className="w-full px-3 py-2 bg-secondary/30 rounded-lg">
+                                                            <div className="flex justify-between">
+                                                                <span className="font-medium">Total Value:</span>
+                                                                <span className="font-bold">
+                                                                    ₹
+                                                                    {" "}
+                                                                    {totalValue.toLocaleString("en-IN", {
+                                                                        maximumFractionDigits: 2,
+                                                                        minimumFractionDigits: 2,
+                                                                    })}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )
+
+                                                : null}
+
+                                            <div className="w-full">
+                                                <FormField
+                                                    control={tradeForm.control}
+                                                    name="notes"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Notes</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="Add notes (optional)"
+                                                                    {...field}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                        </form>
+                                    </Form>
+                                )}
+                    </div>
+                </ScrollArea>
                 <DialogFooter className="">
-                    <div className="w-full flex items-center justify-end">
+                    <div className="w-full flex items-center justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button
                             type="button"
                             className="bg-primary text-sm px-8 rounded-xl"
-                            onClick={addTradeForm.handleSubmit(onSubmit)}
-                            disabled={addTradeForm.formState.isSubmitting}
+                            onClick={tradeForm.handleSubmit(onSubmit)}
+                            disabled={tradeForm.formState.isSubmitting || createTradeMutation.isPending || loadingTradeDetails}
                         >
-                            Save
+                            {createTradeMutation.isPending
+                                ? "Saving..."
+                                : (isEditMode
+                                        ? "Update"
+                                        : "Save")}
                         </Button>
                     </div>
                 </DialogFooter>

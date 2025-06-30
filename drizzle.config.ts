@@ -3,8 +3,8 @@ import type { Config } from "drizzle-kit";
 import env from "@/env";
 
 export default {
-    schema: "./src/api/db/schema.ts",
-    out: "./src/api/db/migrations",
+    schema: "./src/lib/api/db/schema.ts",
+    out: "./src/lib/api/db/migrations",
     dialect: "turso",
     casing: "snake_case",
     dbCredentials: {

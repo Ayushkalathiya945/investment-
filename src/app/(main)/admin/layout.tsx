@@ -1,28 +1,52 @@
 "use client";
 
-import { ChartLine, ChartNoAxesCombined, CreditCard, LogOut, Menu, Users, X } from "lucide-react";
+import { ChartLine, ChartNoAxesCombined, CreditCard, LogOut, Menu, TrendingUp, Users, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
+import AuthGuard from "@/components/AuthGuard";
 import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BROKERAGE, CLIENT, PAYMENT_HISTORY, TRADE } from "@/lib/constants";
+import { BROKERAGE, CLIENT, PAYMENT_HISTORY, STOCKS, TRADE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-export default function Home({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <AuthGuard>
+            <AdminLayoutContent children={children} />
+        </AuthGuard>
+    );
+}
+
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const [isLoggedOut, setIsLoggedOut] = useState<boolean>(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
 
     const navigation = [
         { name: "Client", href: CLIENT, icon: Users },
         { name: "Trade", href: TRADE, icon: ChartNoAxesCombined },
         { name: "Brokerage", href: BROKERAGE, icon: ChartLine },
         { name: "Payment History", href: PAYMENT_HISTORY, icon: CreditCard },
-
+        { name: "Stocks", href: STOCKS, icon: TrendingUp },
     ];
+
+    const logout = async () => {
+        try {
+            // Clear local storage
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+
+            // Redirect to login page
+            router.push("/auth");
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
+        setIsLoggedOut(false);
+    };
 
     return (
         <div className="min-h-screen bg-white font-dmsans">
@@ -171,7 +195,10 @@ export default function Home({ children }: { children: React.ReactNode }) {
                         </Button>
                         <Button
                             variant="destructive"
-                            // onClick={handleLogout}
+
+                            onClick={() => {
+                                logout();
+                            }}
                         >
                             Log Out
                         </Button>

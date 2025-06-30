@@ -2,10 +2,13 @@ import { z } from "zod";
 
 export const addClientSchema = z.object({
     name: z.string().optional(),
-    panNo: z.string().optional(),
+    panNo: z
+        .string()
+        .regex(/^[A-Z]{5}\d{4}[A-Z]$/, "Invalid PAN Card Number")
+        .optional(),
     mobileNo: z.string().optional(),
     email: z.string().email().optional(),
-    address: z.string(),
+    address: z.string().min(5, "Address must be at least 5 characters long").optional(),
 });
 
 export type AddClientField = z.infer<typeof addClientSchema>;
@@ -17,4 +20,107 @@ export type AddClient = {
     mobileNo?: string;
     email?: string;
     address?: string;
+};
+
+// Types for client API responses
+export type Client = {
+    id: number;
+    name: string;
+    email: string;
+    mobile: string;
+    pan: string;
+    address: string;
+    createdAt?: string;
+    updatedAt?: string;
+    // Client detail additional fields
+    totalTradeAmount?: number;
+    totalBrokerageAmount?: number;
+    totalPaymentAmount?: number;
+};
+
+export type ClientCreateRequest = {
+    name: string;
+    email: string;
+    mobile: string;
+    pan: string;
+    address: string;
+};
+
+export type ClientResponse = {
+    success: boolean;
+    message: string;
+    data: Client;
+};
+
+export type ClientsListResponse = {
+    success: boolean;
+    data: Client[];
+    metadata: {
+        total: number;
+        hasNext: boolean;
+    };
+};
+
+export type ClientFilterRequest = {
+    page: number;
+    limit: number;
+    search?: string;
+    startDate?: string; // Client-side date format (YYYY-MM-DD)
+    endDate?: string; // Client-side date format (YYYY-MM-DD)
+    from?: string; // Server-side expected format (YYYY-MM-DD)
+    to?: string; // Server-side expected format (YYYY-MM-DD)
+};
+
+export type ClientUpdateRequest = {
+    id: number;
+    name?: string;
+    email?: string;
+    mobile?: string;
+    pan?: string;
+    address?: string;
+};
+
+export type ClientAnalyticsResponse = {
+    success: boolean;
+    message?: string;
+    data: {
+        totalClient: number;
+        totalValue: number;
+        totalPayment: number;
+        totalBrokerage: number;
+    };
+    _debug?: {
+        timestamp: string;
+        requestData: any;
+        requestUrl: string;
+        responseData?: any;
+    };
+};
+
+// Type for client dropdown items
+export type ClientDropdownItem = {
+    id: number;
+    name: string;
+};
+
+// Response type for client dropdown API
+export type ClientDropdownResponse = {
+    success: boolean;
+    data: ClientDropdownItem[];
+};
+
+// Financial totals response type
+export type FinancialTotalsResponse = {
+    success: boolean;
+    data: {
+        totalPortfolioValue: number;
+        totalBrokerage: number;
+        totalPayments: number;
+    };
+};
+
+// Financial totals request type
+export type FinancialTotalsRequest = {
+    from?: number; // Unix timestamp
+    to?: number; // Unix timestamp
 };

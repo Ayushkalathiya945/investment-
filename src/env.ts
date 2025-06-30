@@ -7,8 +7,8 @@ const EnvSchema = z.object({
     TURSO_DATABASE_URL: z.string().nonempty(),
     TURSO_AUTH_TOKEN: z.string().nonempty(),
     JWT_SECRET: z.string().nonempty(),
-
     ADMIN_PASSWORD: z.string().nonempty(),
+    NEXT_PUBLIC_BACKEND_URL: z.string().url().nonempty().optional().or(z.undefined()),
 });
 export type EnvSchema = z.infer<typeof EnvSchema>;
 

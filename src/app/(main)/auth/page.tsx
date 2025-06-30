@@ -1,12 +1,15 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 
 import type { LoginField } from "@/types/auth.types";
 
+import { Adminlogin, checkAuth } from "@/api/auth";
 import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -24,10 +27,80 @@ const Auth: React.FC = () => {
         mode: "onSubmit",
     });
 
-    const onSubmit = (data: LoginField) => {
-        console.log(data);
-        router.push("/admin/client");
+    // login mutation
+    const { mutateAsync: loginMutation } = useMutation({
+        mutationFn: Adminlogin,
+    });
+
+    const onSubmit = async (data: LoginField) => {
+        try {
+            const result = await toast.promise(
+                loginMutation(data), // mutation promise
+                {
+                    loading: "Signing in...",
+                    success: "Login successful!",
+                    error: "Login failed. Please try again.",
+                },
+            );
+
+            if (result.token) {
+                localStorage.setItem("token", `Bearer ${result.token}`);
+                localStorage.setItem("user", JSON.stringify(result.admin));
+                router.push("/admin/client");
+            } else {
+                toast.error("Invalid login response"); // fallback if no token returned
+            }
+        } catch (err) {
+            console.error("Login error:", err);
+            toast.error("Login failed. Please check your credentials and try again.");
+        }
     };
+
+    // State to track loading during authentication check
+    const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+    // Check if user is already logged in and verify token
+    useEffect(() => {
+        async function verifyAuthentication() {
+            try {
+                setIsAuthChecking(true);
+
+                const isAuthenticated = await checkAuth();
+
+                if (isAuthenticated) {
+                    router.push("/admin/client");
+                }
+            } catch (error) {
+                console.error("Authentication verification failed:", error);
+                if (typeof window !== "undefined") {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
+                }
+            } finally {
+                setIsAuthChecking(false);
+            }
+        }
+
+        if (typeof window !== "undefined") {
+            verifyAuthentication();
+        } else {
+            // Use a timeout to avoid direct setState in useEffect
+            const timer = setTimeout(() => {
+                setIsAuthChecking(false);
+            }, 0);
+
+            return () => clearTimeout(timer);
+        }
+    }, [router]);
+
+    // Show loading state during authentication check
+    if (isAuthChecking) {
+        return (
+            <div className="h-screen w-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     return (
         <div className=" grid grid-cols-1 lg:grid-cols-2 h-screen w-screen items-center justify-center p-2 md:p-5">
