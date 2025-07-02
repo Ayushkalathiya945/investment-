@@ -99,8 +99,8 @@ const Client: React.FC = () => {
         page: currentPage,
         limit: PAGE_LIMIT,
         search: searchTerm.trim() || undefined,
-        startDate: formatDateToYYYYMMDD(dateRange?.from),
-        endDate: formatDateToYYYYMMDD(dateRange?.to),
+        from: formatDateToYYYYMMDD(dateRange?.from),
+        to: formatDateToYYYYMMDD(dateRange?.to),
     };
 
     // Fetch clients data
@@ -224,7 +224,7 @@ const Client: React.FC = () => {
             </div>
             <div className="relative w-full">
                 <div className="absolute left-5 top-1/2 -translate-y-1/2 z-10 text-sm pointer-events-none">
-                    <Search size={18} className="text-primary" />
+                    <Search size={18} className="text-primary pos" />
                 </div>
                 <Input
                     placeholder="Search by name, email or PAN..."
@@ -290,11 +290,13 @@ const Client: React.FC = () => {
                     </Table>
                 </div>
 
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={page => setCurrentPage(page)}
-                />
+                {totalPages > 1 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={page => setCurrentPage(page)}
+                    />
+                )}
             </div>
         </div>
     );

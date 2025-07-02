@@ -18,7 +18,9 @@ export async function update(data: Partial<NewClient> & { id: number }, tx?: Tra
 }
 
 export async function remove(id: number, tx?: TransactionType) {
-    const [client] = await getDB(tx).delete(clients).where(eq(clients.id, id)).returning();
+    const db = getDB(tx);
+
+    const [client] = await db.delete(clients).where(eq(clients.id, id)).returning();
 
     return client ?? null;
 }
@@ -61,10 +63,19 @@ export async function findOne_Or(data: { id?: number; email?: string; pan?: stri
     });
 }
 
-export async function findAllWithPagination(data: { page: number; limit: number; search?: string; id?: number }, tx?: TransactionType) {
+export async function findAllWithPagination(data: {
+    page: number;
+    limit: number;
+    search?: string;
+    id?: number;
+    from?: Date;
+    to?: Date;
+}, tx?: TransactionType) {
     const conditions = [];
+
     if (data.id)
         conditions.push(eq(clients.id, data.id));
+
     if (data.search) {
         const searchTerm = `%${data.search}%`;
         conditions.push(or(
@@ -73,6 +84,18 @@ export async function findAllWithPagination(data: { page: number; limit: number;
             sql`${clients.pan} LIKE ${searchTerm}`,
             sql`${clients.mobile} LIKE ${searchTerm}`,
         ));
+    }
+
+    // Filter by creation date if provided
+    if (data.from) {
+        conditions.push(gte(clients.createdAt, data.from));
+    }
+
+    if (data.to) {
+        // Set end of day for the "to" date
+        const endDate = new Date(data.to);
+        endDate.setHours(23, 59, 59, 999);
+        conditions.push(lte(clients.createdAt, endDate));
     }
 
     const clientsData = await getDB(tx).query.clients.findMany({
@@ -117,6 +140,14 @@ export async function getAllClientsIdAndName(tx?: TransactionType) {
     return clientsData;
 }
 
+/**
+ * Get all clients (optimized for brokerage calculation)
+ * @returns All clients in the database
+ */
+export async function getAllClients(tx?: TransactionType) {
+    return getDB(tx).query.clients.findMany();
+}
+
 export async function calculateFinancialTotalsByDateRange(
     data: { from?: Date; to?: Date },
     tx?: TransactionType,
@@ -139,17 +170,15 @@ export async function calculateFinancialTotalsByDateRange(
         if (to)
             clientCountQuery.where(lte(clients.createdAt, endOfDayTo!));
 
-        // Portfolio Value
         const portfolioValueQuery = db
             .select({
-                totalValue: sql<number>`COALESCE(
-          SUM(
-            CASE 
-              WHEN ${trades.type} = 'BUY' AND ${trades.isFullySold} = 0 
-              THEN ${trades.remainingQuantity} * ${trades.price}
-              ELSE 0 
-            END
-          ), 0)`,
+                totalValue: sql<number>`COALESCE(SUM(
+      CASE 
+        WHEN ${trades.type} = 'BUY' AND ${trades.isFullySold} = false 
+        THEN ${trades.remainingQuantity} * ${trades.price}
+        ELSE 0
+      END
+    ), 0)`,
             })
             .from(trades)
             .where(
@@ -168,8 +197,18 @@ export async function calculateFinancialTotalsByDateRange(
             })
             .from(brokerages);
 
-        // if (from) brokerageQuery.where(gte(brokerages.calculatedAt, new Date(from)));
-        // if (to) brokerageQuery.where(lte(brokerages.calculatedAt, endOfDayTo!));
+        if (from) {
+            const fromMonth = from.getMonth() + 1;
+            if (fromMonth !== null) {
+                brokerageQuery.where(gte(brokerages.month, fromMonth));
+            }
+        }
+        if (to) {
+            const toMonth = to.getMonth() + 1;
+            if (toMonth !== null) {
+                brokerageQuery.where(lte(brokerages.month, toMonth));
+            }
+        }
 
         // Payment
         const paymentsQuery = db
@@ -184,12 +223,12 @@ export async function calculateFinancialTotalsByDateRange(
             paymentsQuery.where(lte(payments.paymentDate, endOfDayTo!));
 
         const [clientCount, portfolioResult, brokerageResult, paymentsResult]
-      = await Promise.all([
-          clientCountQuery.execute(),
-          portfolioValueQuery.execute(),
-          brokerageQuery.execute(),
-          paymentsQuery.execute(),
-      ]);
+            = await Promise.all([
+                clientCountQuery.execute(),
+                portfolioValueQuery.execute(),
+                brokerageQuery.execute(),
+                paymentsQuery.execute(),
+            ]);
 
         const result = {
             totalClient: Number(clientCount[0]?.count || 0),

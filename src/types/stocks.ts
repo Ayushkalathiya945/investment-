@@ -25,10 +25,17 @@ export type StockUploadStats = {
     }>;
 };
 
+export type ValidationError = {
+    fileType: string;
+    message: string;
+    missingColumns?: string[];
+};
+
 export type StockUploadResponse = {
     success: boolean;
     message: string;
     error?: string;
+    validationErrors?: ValidationError[];
     nse?: StockUploadStats;
     bse?: StockUploadStats;
 };

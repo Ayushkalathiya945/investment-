@@ -55,6 +55,8 @@ async function processSellTrade(
             clientId,
             symbol,
             exchange,
+            tradeDate,
+
         },
         tx,
     );
@@ -178,8 +180,11 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
         quantity: number;
         price: number;
         tradeDate: string;
+        exchange: ExchangeType;
         notes?: string;
     };
+
+    console.log("Creating trade with data:", tradeData);
 
     try {
         // Validate client exists
@@ -189,7 +194,7 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
         }
 
         // Validate stock exists
-        const stock = await stockQueries.findOne({ symbol: tradeData.symbol });
+        const stock = await stockQueries.findOne({ symbol: tradeData.symbol, exchange: tradeData.exchange });
         if (!stock) {
             throw new HTTPException(404, { message: "Stock not found" });
         }
@@ -208,7 +213,7 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
                 clientId: tradeData.clientId,
                 symbol: tradeData.symbol,
                 type: tradeData.type,
-                exchange: stock.exchange,
+                exchange: tradeData.exchange,
                 quantity: tradeData.quantity,
                 price: tradeData.price,
                 tradeDate,
@@ -220,6 +225,8 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
                 isFullySold: 0,
                 sellProcessed: tradeData.type === TradeType.SELL ? 0 : 1,
             };
+
+            console.log("Creating trade with data:", tradeData2Create);
 
             const trade = await tradeQueries.create(
                 tradeData2Create,
@@ -322,9 +329,6 @@ async function reverseTrade(
     }
 }
 
-/**
- * Update trade
- */
 tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
     const updateData = c.req.valid("json") as {
         id: number;
@@ -356,7 +360,7 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
 
         // Get stock information (either existing or new)
         const symbolToCheck = updateData.symbol || existingTrade.symbol;
-        const stock = await stockQueries.findOne({ symbol: symbolToCheck });
+        const stock = await stockQueries.findOne({ symbol: symbolToCheck, exchange: existingTrade.exchange });
         if (!stock) {
             throw new HTTPException(404, { message: "Stock not found" });
         } // Use a transaction for all database operations to ensure consistency
@@ -444,9 +448,6 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
     }
 });
 
-/**
- * Get all trades with filters
- */
 tradeRouter.post("/get-all", zValidator("json", tradeFilterSchema), async (c) => {
     const {
         page,
@@ -487,6 +488,8 @@ tradeRouter.post("/get-all", zValidator("json", tradeFilterSchema), async (c) =>
             metadata: {
                 total: count,
                 hasNext: page < totalPage,
+                totalPages: totalPage,
+                currentPage: page,
             },
         });
     } catch {

@@ -8,7 +8,11 @@ export const addClientSchema = z.object({
         .optional(),
     mobileNo: z.string().optional(),
     email: z.string().email().optional(),
-    address: z.string().min(5, "Address must be at least 5 characters long").optional(),
+    address: z.string()
+        .refine(val => val === "" || val === null || val === undefined || val.length >= 5, {
+            message: "Address must be at least 5 characters long if provided",
+        })
+        .optional(),
 });
 
 export type AddClientField = z.infer<typeof addClientSchema>;
@@ -43,7 +47,7 @@ export type ClientCreateRequest = {
     email: string;
     mobile: string;
     pan: string;
-    address: string;
+    address?: string;
 };
 
 export type ClientResponse = {
@@ -65,8 +69,6 @@ export type ClientFilterRequest = {
     page: number;
     limit: number;
     search?: string;
-    startDate?: string; // Client-side date format (YYYY-MM-DD)
-    endDate?: string; // Client-side date format (YYYY-MM-DD)
     from?: string; // Server-side expected format (YYYY-MM-DD)
     to?: string; // Server-side expected format (YYYY-MM-DD)
 };

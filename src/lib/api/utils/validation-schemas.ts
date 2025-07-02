@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { PAGE_LIMIT } from "@/lib/constants";
+
 import { TradeType } from "../db/schema";
 
 // Authentication schemas
@@ -24,7 +26,12 @@ export const clientSchema = z.object({
     email: z.string().email("Invalid email format"),
     mobile: z.string().regex(/^[6-9]\d{9}$/, "Invalid Indian mobile number format"),
     pan: z.string().regex(/^[A-Z]{5}\d{4}[A-Z]$/i, "Invalid PAN format").transform(val => val.toUpperCase()),
-    address: z.string().min(5, "Address must be at least 5 characters").optional(),
+    address: z.union([
+        z.string().min(5, "Address must be at least 5 characters"),
+        z.string().length(0), // Allow empty string
+        z.null(), // Allow null
+        z.undefined(), // Allow undefined
+    ]).optional(),
 });
 
 export const updateClientSchema = clientSchema.partial().extend({
@@ -51,6 +58,9 @@ export const tradeSchema = z.object({
     type: z.nativeEnum(TradeType),
     quantity: z.number().int().positive("Quantity must be positive"),
     price: z.number().positive("Price must be positive"),
+    exchange: z.enum(["NSE", "BSE"], {
+        errorMap: () => ({ message: "Exchange must be either NSE or BSE" }),
+    }),
     tradeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
     notes: z.string().optional(),
 });
@@ -73,7 +83,7 @@ export const updatePaymentSchema = paymentSchema.partial();
 // Pagination and filter schemas
 export const paginationSchema = z.object({
     page: z.number().int().min(1).default(1),
-    limit: z.number().int().min(1).default(10),
+    limit: z.number().int().min(15).default(PAGE_LIMIT),
 });
 
 export const dateRangeSchema = z.object({

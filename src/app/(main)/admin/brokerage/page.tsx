@@ -6,12 +6,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 
-import type { BrokerageCalculateResponse, BrokerageItem } from "@/types/brokerage";
+import type { BrokerageItem } from "@/types/brokerage";
 
 import { getAllPeriodicBrokerage, getBrokerageRecords } from "@/api/brokerage";
 import { getAllClientsForDropdown } from "@/api/client";
-import BrokerageResults from "@/components/BrokerageResults";
-import CalculateBrokerageButton from "@/components/Dialoge/CalculateBrokerageButton";
 import StatCard from "@/components/StatCard";
 import MonthRangePicker from "@/components/ui/monthRangePicker";
 import { Pagination } from "@/components/ui/pagination";
@@ -107,7 +105,6 @@ const Brokerage: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState(initialPage);
     const [dateRange, setDateRange] = useState<MonthRange>(initialDateRange);
-    const [calculationResult, setCalculationResult] = useState<BrokerageCalculateResponse | null>(null);
     const [brokerageData, setBrokerageData] = useState<BrokerageItem[]>([]);
     const [periodType, setPeriodType] = useState<PeriodType>(initialPeriodType);
     const [totalBrokerageAmount, setTotalBrokerageAmount] = useState<number>(0);
@@ -116,6 +113,9 @@ const Brokerage: React.FC = () => {
     const [selectedQuarter, setSelectedQuarter] = useState<number>(initialQuarter);
     const [selectedYear, setSelectedYear] = useState<number>(initialYear);
     const [clients, setClients] = useState<Array<{ id: number; name: string }>>([]);
+    const [serverPaginationData, setServerPaginationData] = useState<{
+        totalPages: number;
+    }>({ totalPages: 1 });
 
     const updateURLParams = useCallback((params: { [key: string]: string | null }) => {
         const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -185,10 +185,9 @@ const Brokerage: React.FC = () => {
 
                 if (selectedClientId) {
                     const filterParams = {
-                        page: 1,
-                        limit: 20,
+                        page: currentPage,
+                        limit: PAGE_LIMIT,
                         clientId: selectedClientId,
-
                         year: selectedYear || new Date().getFullYear(),
 
                         ...(dateRange.from && dateRange.to && {
@@ -208,23 +207,22 @@ const Brokerage: React.FC = () => {
                     response = await getBrokerageRecords(filterParams);
                 } else {
                     if (periodType === PeriodType.QUARTER) {
-                        // console.log(`🔍 Fetching quarterly data with params:`, {
-                        //     periodType,
-                        //     quarter: selectedQuarter,
-                        //     year: selectedYear,
-                        // });
-                        response = await getAllPeriodicBrokerage(periodType, selectedQuarter, selectedYear);
+                        response = await getAllPeriodicBrokerage(
+                            periodType,
+                            selectedQuarter,
+                            selectedYear,
+                            currentPage,
+                            PAGE_LIMIT,
+                        );
                     } else if (periodType === PeriodType.MONTH) {
                         if (dateRange.from && dateRange.to) {
                             const filterParams = {
-                                page: 1,
-                                limit: 1000,
+                                page: currentPage,
+                                limit: PAGE_LIMIT,
                                 periodType: PeriodType.MONTH,
                                 from: formatDateString(dateRange.from),
                                 to: formatDateString(dateRange.to),
                             };
-
-                            // console.log(`Fetching monthly data with date range:`, filterParams);
 
                             response = await getBrokerageRecords(filterParams);
                         } else if (searchParams.get("from") && searchParams.get("to") && Object.keys(dateRange).length > 0) {
@@ -235,10 +233,9 @@ const Brokerage: React.FC = () => {
                             const toDate = toParam ? parseDateFromString(toParam) : undefined;
 
                             const filterParams = {
-                                page: 1,
-                                limit: 1000,
+                                page: currentPage,
+                                limit: PAGE_LIMIT,
                                 periodType: PeriodType.MONTH,
-                                // Use formatDateString to ensure YYYY-MM-DD format
                                 ...(fromDate && toDate
                                     ? {
                                             from: formatDateString(fromDate),
@@ -250,25 +247,28 @@ const Brokerage: React.FC = () => {
                             // console.log(`🔍 Fetching monthly data with URL date parameters:`, filterParams);
                             response = await getBrokerageRecords(filterParams);
                         } else {
-                            // No date range selected, use current month
                             const currentDate = new Date();
                             const defaultMonth = currentDate.getMonth() + 1;
                             const defaultYear = currentDate.getFullYear();
 
-                            // Check if we're handling a cleared date range
                             const isEmptyDateRange = Object.keys(dateRange).length === 0;
 
                             if (isEmptyDateRange) {
                                 const cleanParams = {
-                                    page: 1,
-                                    limit: 20,
+                                    page: currentPage,
+                                    limit: PAGE_LIMIT,
                                     periodType: PeriodType.MONTH,
-
                                 };
 
                                 response = await getBrokerageRecords(cleanParams);
                             } else {
-                                response = await getAllPeriodicBrokerage(PeriodType.MONTH, defaultMonth, defaultYear);
+                                response = await getAllPeriodicBrokerage(
+                                    PeriodType.MONTH,
+                                    defaultMonth,
+                                    defaultYear,
+                                    currentPage,
+                                    PAGE_LIMIT,
+                                );
                             }
                         }
                     }
@@ -282,9 +282,17 @@ const Brokerage: React.FC = () => {
                         0,
                     );
                     setTotalBrokerageAmount(totalBrokerage);
+
+                    // Update pagination data from the server response
+                    if (response.metadata) {
+                        setServerPaginationData({
+                            totalPages: response.metadata.totalPages || Math.ceil(response.metadata.total / PAGE_LIMIT),
+                        });
+                    }
                 } else {
                     setBrokerageData([]);
                     setTotalBrokerageAmount(0);
+                    setServerPaginationData({ totalPages: 1 });
                     console.warn("⚠️ Received invalid brokerage data", response);
                 }
             } catch (error) {
@@ -296,9 +304,8 @@ const Brokerage: React.FC = () => {
         };
 
         fetchData();
-    }, [periodType, selectedClientId, dateRange, selectedQuarter, selectedYear]);
+    }, [periodType, selectedClientId, dateRange, selectedQuarter, selectedYear, currentPage]);
 
-    // Additional useEffect to sync URL params when selectedQuarter, selectedYear, or dateRange changes
     useEffect(() => {
         if (periodType === PeriodType.QUARTER) {
             updateURLParams({
@@ -310,180 +317,75 @@ const Brokerage: React.FC = () => {
             });
         } else if (periodType === PeriodType.MONTH) {
             if (dateRange.from && dateRange.to) {
-                // Make sure date range is reflected in URL for monthly view
                 updateURLParams({
-                    // Format dates as YYYY-MM-DD for API compatibility
                     from: formatDateString(dateRange.from),
                     to: formatDateString(dateRange.to),
-                    // Clear quarter and year params when in monthly mode with date range
                     quarter: null,
                     year: null,
                 });
             } else if (Object.keys(dateRange).length === 0) {
-                // When date range is cleared, make sure URL reflects that
                 updateURLParams({
                     from: null,
                     to: null,
-                    // Keep periodType
                     periodType: PeriodType.MONTH,
                 });
             }
         }
     }, [selectedQuarter, selectedYear, periodType, dateRange, updateURLParams]);
 
-    // Filter data based on date range
-    const filteredData = brokerageData.filter((item: BrokerageItem) => {
-        // Skip invalid items
-        if (!item || !item.date)
-            return false;
-
-        // Check if we have date range in state
-        const { from, to } = dateRange ?? {};
-
-        // If no date range in state or URL, show all data
-        if ((!from || !to) && !searchParams.get("from") && !searchParams.get("to"))
-            return true;
-
-        // Parse the date string to create a Date object
-        const [periodName, year] = (item.date || "Unknown 2025").split(" ");
-        let itemDate: Date;
-
-        if (item.periodType === PeriodType.QUARTER) {
-            // For quarterly data, use the first month of the quarter
-            const quarterMonths = [0, 3, 6, 9]; // Starting months for each quarter (0-indexed)
-            const quarterIndex = Number.parseInt(periodName.replace("Q", "")) - 1;
-            if (quarterIndex < 0 || quarterIndex > 3)
-                return true;
-
-            itemDate = new Date(Number.parseInt(year), quarterMonths[quarterIndex], 1);
-        } else {
-            // For monthly data
-            const monthNames = [
-                "January",
-                "February",
-                "March",
-                "April",
-                "May",
-                "June",
-                "July",
-                "August",
-                "September",
-                "October",
-                "November",
-                "December",
-            ];
-            const monthIndex = monthNames.indexOf(periodName);
-            if (monthIndex === -1)
-                return true;
-
-            itemDate = new Date(Number.parseInt(year), monthIndex, 1);
-        }
-
-        // Try to use date range from state first
-        if (from && to) {
-            const fromDate = new Date(from.getFullYear(), from.getMonth(), 1);
-            const toDate = new Date(to.getFullYear(), to.getMonth() + 1, 0);
-            return itemDate >= fromDate && itemDate <= toDate;
-        }
-
-        // If we don't have date range in state, try to parse directly from URL
-        const fromParam = searchParams.get("from");
-        const toParam = searchParams.get("to");
-        if (fromParam && toParam) {
-            try {
-                const fromDate = new Date(fromParam);
-                const toDate = new Date(toParam);
-                if (!Number.isNaN(fromDate.getTime()) && !Number.isNaN(toDate.getTime())) {
-                    return itemDate >= fromDate && itemDate <= toDate;
-                }
-            } catch (error) {
-                console.warn("Failed to parse date parameters from URL", error);
-            }
-        }
-
-        // If no valid date range, include all items
-        return true;
-    });
-
     const handleDateChange = (range: MonthRange) => {
-        // Check if this is a "clear" action (both from and to are undefined)
         const isClearing = !range.from && !range.to;
 
         if (isClearing) {
-            console.log("🧹 Clearing date range");
-            // When clearing the date range, we need to fully reset the date state
             setDateRange({});
         } else {
-            // Normal date change
             setDateRange(range);
         }
 
-        setCurrentPage(1); // Reset to first page when filtering
+        setCurrentPage(1);
 
-        // Create parameters for URL
         const params: Record<string, string | null> = {
             page: "1",
         };
 
-        // When range is cleared, we want to completely remove date params from URL
         if (range.from && range.to) {
-            // Only add date params if both dates are present
-            params.from = formatDateString(range.from); // Use YYYY-MM-DD format instead of ISO
+            params.from = formatDateString(range.from);
             params.to = formatDateString(range.to);
         } else {
-            // Explicitly remove date params from URL
             params.from = null;
             params.to = null;
         }
 
-        // Keep clientId if selected
         if (selectedClientId) {
             params.clientId = selectedClientId.toString();
         }
 
-        // Always set period type when clearing
         if (isClearing) {
-            // Always use MONTH as default period type when clearing
             params.periodType = PeriodType.MONTH;
             setPeriodType(PeriodType.MONTH);
         } else if (!range.from || !range.to) {
-            // Handle partial clearing (only one date selected)
             params.periodType = PeriodType.MONTH;
             setPeriodType(PeriodType.MONTH);
         } else {
-            // Keep periodType parameter if date range is not cleared
             params.periodType = periodType;
         }
 
-        // Handle quarterly parameters based on current period type
         if (periodType === PeriodType.QUARTER && !isClearing) {
-            // If we're in Quarterly mode AND not clearing, keep using quarter and year parameters
             params.quarter = selectedQuarter.toString();
             params.year = selectedYear.toString();
         } else {
-            // For Monthly mode or when clearing, ensure quarter and year are not included
             params.quarter = null;
             params.year = null;
         }
 
-        // Update URL without changing period type
         updateURLParams(params);
-
-        // We don't change the period type anymore - it stays as what the user selected
     };
 
-    // Pagination - handle on frontend since we've already filtered the data
-    const startIndex = (currentPage - 1) * PAGE_LIMIT;
-    const endIndex = startIndex + PAGE_LIMIT;
-    const paginatedData = filteredData.slice(startIndex, endIndex);
-    const totalPages = Math.ceil(filteredData.length / PAGE_LIMIT);
+    const paginatedData = brokerageData;
 
-    // Handle page change
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
-        // Update URL parameter for page
         updateURLParams({ page: page.toString() });
-        // Scroll to top of the table
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -492,22 +394,14 @@ const Brokerage: React.FC = () => {
             <div className="flex-col md:flex md:flex-row justify-between w-full">
                 <h1 className="text-3xl font-semibold">Brokerage</h1>
                 <div className="flex-col md:flex md:flex-row gap-4 items-center">
-                    <CalculateBrokerageButton
-                        onCalculationComplete={(data) => {
-                            setCalculationResult(data);
-                            toast.success("Brokerage calculation completed!");
-                        }}
-                        className="mb-2 md:mb-0"
-                    />
                     <div className="flex min-w-50">
                         <Select
                             value={selectedClientId ? String(selectedClientId) : "all"}
                             onValueChange={(value) => {
                                 const newClientId = value === "all" ? undefined : Number(value);
                                 setSelectedClientId(newClientId);
-                                setCurrentPage(1); // Reset to first page when changing client
+                                setCurrentPage(1);
 
-                                // Update URL parameters, keeping other relevant parameters based on period type
                                 const params: Record<string, string | null> = {
                                     clientId: newClientId ? String(newClientId) : null,
                                     page: "1",
@@ -539,29 +433,24 @@ const Brokerage: React.FC = () => {
                             onValueChange={(value) => {
                                 const newPeriodType = value as PeriodType;
                                 setPeriodType(newPeriodType);
-                                setCurrentPage(1); // Reset to first page when changing period type
+                                setCurrentPage(1);
 
-                                // Clear date range state regardless of period type
                                 setDateRange({});
 
-                                // Create an object with only the parameters needed for the new period type
                                 const newParams: Record<string, string> = {
                                     periodType: newPeriodType,
                                     page: "1",
                                 };
 
-                                // Add relevant parameters based on period type
                                 if (newPeriodType === PeriodType.QUARTER) {
                                     newParams.quarter = selectedQuarter.toString();
                                     newParams.year = selectedYear.toString();
                                 }
 
-                                // Add client ID if one is selected (this works for both period types)
                                 if (selectedClientId) {
                                     newParams.clientId = selectedClientId.toString();
                                 }
 
-                                // Clear all existing URL parameters and set only the new ones
                                 const queryString = new URLSearchParams(newParams).toString();
                                 router.replace(`${pathname}?${queryString}`, { scroll: false });
                             }}
@@ -584,9 +473,8 @@ const Brokerage: React.FC = () => {
                                 onValueChange={(value) => {
                                     const year = Number.parseInt(value);
                                     setSelectedYear(year);
-                                    setCurrentPage(1); // Reset to first page when changing year
+                                    setCurrentPage(1);
 
-                                    // Keep all existing parameters, update year and page
                                     updateURLParams({
                                         year: year.toString(),
                                         page: "1",
@@ -613,9 +501,8 @@ const Brokerage: React.FC = () => {
                                 onValueChange={(value) => {
                                     const quarter = Number.parseInt(value);
                                     setSelectedQuarter(quarter);
-                                    setCurrentPage(1); // Reset to first page when changing quarter
+                                    setCurrentPage(1);
 
-                                    // Keep all existing parameters, update quarter and page
                                     updateURLParams({
                                         quarter: quarter.toString(),
                                         page: "1",
@@ -660,13 +547,6 @@ const Brokerage: React.FC = () => {
                 />
             </div>
 
-            {calculationResult
-                ? (
-                        <div className="mt-4 mb-6">
-                            <BrokerageResults data={calculationResult} />
-                        </div>
-                    )
-                : null}
             <div className="h-full flex flex-col flex-grow gap-10 justify-between">
                 <div className="w-full h-full flex flex-col justify-between border rounded-xl border-[#EFF6FF]">
                     <Table className="bg-white">
@@ -693,7 +573,7 @@ const Brokerage: React.FC = () => {
                                             </TableRow>
                                         )
                                     : paginatedData.map((item: BrokerageItem, index: number) => {
-                                            // Format the brokerage amount as currency
+                                        // Format the brokerage amount as currency
                                             const formattedAmount = new Intl.NumberFormat("en-IN", {
                                                 style: "currency",
                                                 currency: "INR",
@@ -702,11 +582,11 @@ const Brokerage: React.FC = () => {
 
                                             return (
                                                 <TableRow
-                                                    // Create a unique composite key using clientId, date, and index to prevent duplicate key issues
+                                                // Create a unique composite key using clientId, date, and index to prevent duplicate key issues
                                                     key={`${item.clientId}-${item.date}-${index}`}
                                                     className="w-full py-10 gap-4 mx-3"
                                                 >
-                                                    <TableCell>{startIndex + index + 1}</TableCell>
+                                                    <TableCell>{((currentPage - 1) * PAGE_LIMIT) + index + 1}</TableCell>
                                                     <TableCell>{item.clientName}</TableCell>
                                                     <TableCell className="text-green-500">{formattedAmount}</TableCell>
                                                     <TableCell>{item.date}</TableCell>
@@ -718,11 +598,13 @@ const Brokerage: React.FC = () => {
                     </Table>
                 </div>
 
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={handlePageChange}
-                />
+                {serverPaginationData.totalPages > 1 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={serverPaginationData.totalPages}
+                        onPageChange={handlePageChange}
+                    />
+                )}
             </div>
 
         </div>

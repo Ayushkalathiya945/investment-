@@ -21,7 +21,7 @@ export default function StockManagementPage() {
                 <div>
                     <h2 className="text-xl font-semibold mb-4">Upload Stock Data</h2>
                     <p className="mb-4 text-slate-600">
-                        Upload stock data from CSV files for NSE or BSE exchanges. The uploaded data will replace any existing stock data for the selected exchange.
+                        Upload stock data CSV files for both NSE and BSE exchanges. The uploaded data will replace any existing stock data for both exchanges.
                     </p>
                     <div className="mt-6">
                         <StockCSVUploader onSuccess={handleUploadSuccess} />

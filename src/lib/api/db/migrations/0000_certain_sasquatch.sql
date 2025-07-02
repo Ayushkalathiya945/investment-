@@ -33,8 +33,8 @@ CREATE TABLE `brokerage_details` (
 	`calculation_formula` text,
 	`notes` text,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`brokerage_id`) REFERENCES `brokerages`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`brokerage_id`) REFERENCES `brokerages`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `brokerage_trade_idx` ON `brokerage_details` (`brokerage_id`,`trade_id`);--> statement-breakpoint
@@ -54,7 +54,7 @@ CREATE TABLE `brokerages` (
 	`total_positions` integer NOT NULL,
 	`calculated_at` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `period_idx` ON `brokerages` (`calculation_period`);--> statement-breakpoint
@@ -65,7 +65,7 @@ CREATE TABLE `clients` (
 	`pan` text NOT NULL,
 	`email` text NOT NULL,
 	`mobile` text NOT NULL,
-	`address` text NOT NULL,
+	`address` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -90,8 +90,9 @@ CREATE TABLE `fifo_allocations` (
 	`profit_loss` real NOT NULL,
 	`holding_days` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`sell_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`buy_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`sell_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`buy_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `fifo_client_symbol_idx` ON `fifo_allocations` (`client_id`,`symbol`,`exchange`);--> statement-breakpoint
@@ -107,25 +108,11 @@ CREATE TABLE `payments` (
 	`brokerage_id` integer,
 	`notes` text,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`brokerage_id`) REFERENCES `brokerages`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
 CREATE INDEX `payment_client_date_idx` ON `payments` (`client_id`,`payment_date`);--> statement-breakpoint
-CREATE TABLE `positions` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`client_id` integer NOT NULL,
-	`symbol` text NOT NULL,
-	`exchange` text NOT NULL,
-	`quantity` integer NOT NULL,
-	`average_price` real NOT NULL,
-	`total_investment` real NOT NULL,
-	`first_purchase_date` integer NOT NULL,
-	`last_brokerage_month` integer,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE no action
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `positions_client_id_symbol_exchange_unique` ON `positions` (`client_id`,`symbol`,`exchange`);--> statement-breakpoint
 CREATE TABLE `stocks` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`symbol` text NOT NULL,
@@ -156,7 +143,7 @@ CREATE TABLE `trades` (
 	`notes` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `client_symbol_idx` ON `trades` (`client_id`,`symbol`,`exchange`);--> statement-breakpoint

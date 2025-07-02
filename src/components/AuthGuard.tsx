@@ -11,10 +11,6 @@ type AuthGuardProps = {
     children: ReactNode;
 };
 
-/**
- * AuthGuard component protects routes by verifying authentication
- * Use this in layout files for protected routes
- */
 function AuthGuard({ children }: AuthGuardProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +39,6 @@ function AuthGuard({ children }: AuthGuardProps) {
         verifyAuth();
     }, [router]);
 
-    // Show loading state
     if (isLoading) {
         return (
             <div className="h-screen w-screen flex items-center justify-center">
@@ -52,7 +47,6 @@ function AuthGuard({ children }: AuthGuardProps) {
         );
     }
 
-    // Render children only if authenticated
     return isAuthenticated ? <>{children}</> : null;
 }
 

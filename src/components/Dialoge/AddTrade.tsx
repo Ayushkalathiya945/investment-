@@ -3,9 +3,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
+import AutoSizer from "react-virtualized-auto-sizer";
+import { FixedSizeList as List } from "react-window";
 import { z } from "zod";
 
 import type { ClientDropdownItem } from "@/types/client";
@@ -59,6 +62,27 @@ const tradeSchema = z.object({
 
 type TradeFormValues = z.infer<typeof tradeSchema>;
 
+function StockItem({ data, index, style }: { data: any; index: number; style: React.CSSProperties }) {
+    const stock = data.items[index];
+    const tradeForm = data.tradeForm;
+    const setOpenStockPopover = data.setOpenStockPopover;
+
+    return (
+        <Button
+            variant="ghost"
+            className="w-full justify-start text-left hover:bg-secondary cursor-pointer"
+            style={style}
+            onClick={() => {
+                tradeForm.setValue("exchange", stock.exchange);
+                tradeForm.setValue("symbol", stock.value);
+                setOpenStockPopover(false);
+            }}
+        >
+            {stock.label}
+        </Button>
+    );
+}
+
 const AddTrade: React.FC<AddTradeProps> = ({
     name = "Add Trade",
     onSuccess,
@@ -97,7 +121,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
         refetchOnWindowFocus: false,
     });
 
-    // Fetch stock symbols
+    // Fetch stock symbols - only when dialog is open
     const { data: stockSymbols, isLoading: loadingStocks, error: stockError } = useQuery({
         queryKey: ["stockSymbols"],
         queryFn: async () => {
@@ -115,6 +139,8 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 throw error;
             }
         },
+        // Only enable the query when the dialog is open
+        enabled: open,
         staleTime: 5 * 60 * 1000,
         retry: (failureCount, error: any) => {
             if (failureCount < 2 && error.message && !error.message.includes("Invalid response format")) {
@@ -168,8 +194,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
             const nseArray = stockSymbols.nse || [];
             const bseArray = stockSymbols.bse || [];
 
-            // //console.log(nseArray, bseArray);
-
             // Format NSE stocks
             if (Array.isArray(nseArray) && nseArray.length > 0) {
                 const nseStocks = nseArray.map(symbol => ({
@@ -189,28 +213,10 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 }));
                 result.push(...bseStocks);
             }
-
-            // If no stocks are available, provide hardcoded examples for development
-            if (result.length === 0) {
-                console.warn("No stocks found. Using example stocks for development");
-                return [
-                    { label: "RELIANCE-NSE", value: "RELIANCE", exchange: "NSE" as const },
-                    { label: "TCS-NSE", value: "TCS", exchange: "NSE" as const },
-                    { label: "HDFC-NSE", value: "HDFC", exchange: "NSE" as const },
-                    { label: "TATASTEEL-BSE", value: "TATASTEEL", exchange: "BSE" as const },
-                    { label: "INFY-BSE", value: "INFY", exchange: "BSE" as const },
-                ];
-            }
-
             return result;
         } catch (error) {
             console.error("Error formatting stock symbols:", error);
-
-            return [
-                { label: "RELIANCE-NSE", value: "RELIANCE", exchange: "NSE" as const },
-                { label: "TCS-NSE", value: "TCS", exchange: "NSE" as const },
-                { label: "HDFC-BSE", value: "HDFC", exchange: "BSE" as const },
-            ];
+            return [];
         }
     }, [stockSymbols]);
 
@@ -371,23 +377,36 @@ const AddTrade: React.FC<AddTradeProps> = ({
         return 0;
     };
 
+    // Handle invalid data scenario
     useEffect(() => {
-        if (!loadingStocks && (!stockSymbols
-            || typeof stockSymbols !== "object"
-            || (!Array.isArray(stockSymbols.nse) && !Array.isArray(stockSymbols.bse)))) {
-            queryClient.invalidateQueries({ queryKey: ["stockSymbols"] });
-        }
-    }, [stockSymbols, loadingStocks, queryClient]);
+        // Only check if we're showing the dialog
+        if (open && !loadingStocks) {
+            const hasValidData = stockSymbols
+                && typeof stockSymbols === "object"
+                && (Array.isArray(stockSymbols.nse) || Array.isArray(stockSymbols.bse));
 
-    useEffect(() => {
-        if (open) {
-            if (!loadingStocks && formattedStocks.length === 0
-                && (!stockSymbols || typeof stockSymbols !== "object"
-                    || (!Array.isArray(stockSymbols.nse) && !Array.isArray(stockSymbols.bse)))) {
+            if (!hasValidData) {
+                // If we don't have valid data while the dialog is open, try to refetch
                 queryClient.invalidateQueries({ queryKey: ["stockSymbols"] });
             }
         }
-    }, [open, formattedStocks.length, loadingStocks, queryClient, stockSymbols]);
+    }, [stockSymbols, loadingStocks, queryClient, open]);
+
+    // Pre-fetch data when dialog opens
+    useEffect(() => {
+        // When the dialog opens...
+        if (open) {
+            // If we don't have any stock data from any source, trigger the query
+            if (formattedStocks.length === 0) {
+                // Prefetch the data
+                queryClient.prefetchQuery({
+                    queryKey: ["stockSymbols"],
+                    queryFn: getStockSymbols,
+                    staleTime: 5 * 60 * 1000, // 5 minutes
+                });
+            }
+        }
+    }, [open, formattedStocks.length, queryClient]);
 
     const totalValue = calculateTotalValue();
 
@@ -400,11 +419,55 @@ const AddTrade: React.FC<AddTradeProps> = ({
     //     return () => subscription.unsubscribe();
     // }, [tradeForm]);
 
+    // State to track button loading
+    const [isButtonLoading, setIsButtonLoading] = useState(false);
+
+    // Handle dialog open with prefetching
+    const handleDialogOpen = (newOpenState: boolean) => {
+        if (newOpenState) {
+            // If opening and we don't have data, show loading state
+            if (formattedStocks.length === 0) {
+                setIsButtonLoading(true);
+
+                // Prefetch the stock symbols before opening the dialog
+                queryClient.prefetchQuery({
+                    queryKey: ["stockSymbols"],
+                    queryFn: getStockSymbols,
+                    staleTime: 5 * 60 * 1000,
+                }).then(() => {
+                    setIsButtonLoading(false);
+                    setOpen(true);
+                }).catch(() => {
+                    setIsButtonLoading(false);
+                    setOpen(true); // Open anyway, will show error state inside
+                });
+            } else {
+                // We already have data, just open
+                setOpen(true);
+            }
+        } else {
+            // Just close
+            setOpen(false);
+        }
+    };
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleDialogOpen}>
             <DialogTrigger asChild>
-                <Button className="ml-auto bg-primary px-5 md:px-8 rounded-xl">
-                    +
+                <Button
+                    className="ml-auto bg-primary px-5 md:px-8 rounded-xl"
+                    disabled={isButtonLoading}
+                >
+                    {isButtonLoading
+                        ? (
+                                <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            )
+                        : (
+                                <Plus size={18} />
+                            )}
                     <span className="hidden md:flex">{name}</span>
                 </Button>
             </DialogTrigger>
@@ -656,11 +719,11 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                             </Button>
                                                                         </FormControl>
                                                                     </PopoverTrigger>
-                                                                    <PopoverContent className="w-[300px] p-2" style={{ maxHeight: "calc(100vh - 100px)", overflow: "visible" }}>
+                                                                    <PopoverContent className="w-[300px] p-2" style={{ maxHeight: "calc(100vh - 100px)", overflow: "auto" }}>
                                                                         <div className="space-y-2">
                                                                             <Input
                                                                                 placeholder="Search or type stock symbol..."
-                                                                                className="h-9"
+                                                                                className="h-9 mb-2"
                                                                                 value={searchTerm}
                                                                                 onChange={e => setSearchTerm(e.target.value)}
                                                                                 onKeyDown={(e) => {
@@ -691,53 +754,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                 }}
                                                                             />
 
-                                                                            {/* Show "Use as symbol" button if there's a search term */}
-                                                                            {searchTerm.trim() !== "" && (
-                                                                                <Card className="border border-gray-200 mb-2">
-                                                                                    <CardContent className="p-2">
-                                                                                        <Button
-                                                                                            type="button"
-                                                                                            variant="outline"
-                                                                                            className="text-xs w-full"
-                                                                                            onClick={() => {
-                                                                                                const cleanSymbol = searchTerm.trim().replace(/-NSE|-BSE/i, "");
-
-                                                                                                // Determine the exchange more accurately - look for BSE indicators
-                                                                                                const hasBseIndicator
-                                                                                                = searchTerm.toUpperCase().includes("-BSE")
-                                                                                                    || searchTerm.toUpperCase().endsWith("BSE")
-                                                                                                    || searchTerm.toLowerCase() === "bse"
-                                                                                                    || searchTerm.toLowerCase().includes(" bse");
-
-                                                                                                const exchange = hasBseIndicator
-                                                                                                    ? "BSE" as const
-                                                                                                    : "NSE" as const;
-
-                                                                                                // //console.log(`Setting symbol: ${cleanSymbol}, exchange: ${exchange} from button`);
-
-                                                                                                // Set exchange first, then symbol - this order is important for consistent UI updates
-                                                                                                tradeForm.setValue("exchange", exchange);
-                                                                                                tradeForm.setValue("symbol", cleanSymbol);
-
-                                                                                                // Verify the form state after setting values
-                                                                                                // setTimeout(() => {
-                                                                                                //     //console.log("Updated form state from button:", {
-                                                                                                //         symbol: tradeForm.getValues("symbol"),
-                                                                                                //         exchange: tradeForm.getValues("exchange")
-                                                                                                //     });
-                                                                                                // }, 0);
-                                                                                                setOpenStockPopover(false);
-                                                                                            }}
-                                                                                        >
-                                                                                            Use "
-                                                                                            {searchTerm}
-                                                                                            " as symbol
-                                                                                        </Button>
-                                                                                    </CardContent>
-                                                                                </Card>
-                                                                            )}
-
-                                                                            {/* Error handling */}
+                                                                            {/* "Use as symbol" button section has been removed */}
                                                                             {stockError && (
                                                                                 <Card className="border border-red-200 mb-2">
                                                                                     <CardContent className="p-2">
@@ -756,24 +773,25 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                 </Card>
                                                                             )}
 
-                                                                            <ScrollArea className="h-64 overflow-hidden border rounded-md" style={{ display: "block" }}>
-                                                                                <div className="p-2 pb-3">
-                                                                                    {loadingStocks
-                                                                                        ? (
-                                                                                                <div className="flex items-center justify-center p-4 gap-2 text-sm">
-                                                                                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                                                    </svg>
-                                                                                                    <span>Loading stock symbols...</span>
-                                                                                                </div>
-                                                                                            )
-
-                                                                                        : filteredStocks.length === 0 && !stockError
-
+                                                                            <div className="h-72 overflow-hidden border rounded-md" style={{ display: "block" }}>
+                                                                                {loadingStocks
+                                                                                    ? (
+                                                                                            <div className="flex items-center justify-center p-4 gap-2 text-sm">
+                                                                                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                                                </svg>
+                                                                                                <span>Loading stock symbols...</span>
+                                                                                            </div>
+                                                                                        )
+                                                                                    : (filteredStocks.length === 0 && !stockError)
                                                                                             ? (
                                                                                                     <div className="p-2 text-center text-sm">
-                                                                                                        <p>No matching stocks found.</p>
+                                                                                                        <p>
+                                                                                                            {searchTerm.trim() !== ""
+                                                                                                                ? "No matching stocks found."
+                                                                                                                : "No stocks found."}
+                                                                                                        </p>
                                                                                                         {searchTerm.trim() !== "" && (
                                                                                                             <p className="text-xs text-gray-500 mt-1">
                                                                                                                 Press Enter to use "
@@ -796,36 +814,29 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                                                         stocks
                                                                                                                     </span>
                                                                                                                 </div>
-                                                                                                                <div className="space-y-1">
-                                                                                                                    {filteredStocks
-                                                                                                                        .filter(stock => stock.exchange === "NSE")
-                                                                                                                        .map(stock => (
-                                                                                                                            <Button
-                                                                                                                                key={stock.label}
-                                                                                                                                variant="ghost"
-                                                                                                                                className="w-full justify-start text-left hover:bg-secondary cursor-pointer"
-                                                                                                                                onClick={() => {
-                                                                                                                                    // Log before setting values
-                                                                                                                                    // //console.log(`Selecting stock: ${stock.value}, exchange: NSE, label: ${stock.label}`);
-
-                                                                                                                                    // Set exchange first, then symbol - this order is important for consistent UI updates
-                                                                                                                                    tradeForm.setValue("exchange", "NSE" as const);
-                                                                                                                                    tradeForm.setValue("symbol", stock.value);
-
-                                                                                                                                    // Verify the form state after setting values
-                                                                                                                                    // setTimeout(() => {
-                                                                                                                                    //     //console.log("Updated form state:", {
-                                                                                                                                    //         symbol: tradeForm.getValues("symbol"),
-                                                                                                                                    //         exchange: tradeForm.getValues("exchange")
-                                                                                                                                    //     });
-                                                                                                                                    // }, 0);
-
-                                                                                                                                    setOpenStockPopover(false);
+                                                                                                                <div style={{
+                                                                                                                    height: filteredStocks.filter(stock => stock.exchange === "BSE").length > 0
+                                                                                                                        ? "120px"
+                                                                                                                        : "200px",
+                                                                                                                }}
+                                                                                                                >
+                                                                                                                    <AutoSizer>
+                                                                                                                        {({ height, width }) => (
+                                                                                                                            <List
+                                                                                                                                height={height}
+                                                                                                                                itemCount={filteredStocks.filter(stock => stock.exchange === "NSE").length}
+                                                                                                                                itemSize={35}
+                                                                                                                                width={width}
+                                                                                                                                itemData={{
+                                                                                                                                    items: filteredStocks.filter(stock => stock.exchange === "NSE"),
+                                                                                                                                    tradeForm,
+                                                                                                                                    setOpenStockPopover,
                                                                                                                                 }}
                                                                                                                             >
-                                                                                                                                {stock.label}
-                                                                                                                            </Button>
-                                                                                                                        ))}
+                                                                                                                                {StockItem}
+                                                                                                                            </List>
+                                                                                                                        )}
+                                                                                                                    </AutoSizer>
                                                                                                                 </div>
                                                                                                             </>
                                                                                                         )}
@@ -841,43 +852,35 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                                                         stocks
                                                                                                                     </span>
                                                                                                                 </div>
-                                                                                                                <div className="space-y-1">
-                                                                                                                    {filteredStocks
-                                                                                                                        .filter(stock => stock.exchange === "BSE")
-                                                                                                                        .map(stock => (
-                                                                                                                            <Button
-                                                                                                                                key={stock.label}
-                                                                                                                                variant="ghost"
-                                                                                                                                className="w-full justify-start text-left hover:bg-secondary cursor-pointer"
-                                                                                                                                onClick={() => {
-                                                                                                                                    // Log before setting values
-                                                                                                                                    // //console.log(`Selecting stock: ${stock.value}, exchange: BSE, label: ${stock.label}`);
-
-                                                                                                                                    // Set exchange first, then symbol - this order is important for consistent UI updates
-                                                                                                                                    tradeForm.setValue("exchange", "BSE" as const);
-                                                                                                                                    tradeForm.setValue("symbol", stock.value);
-
-                                                                                                                                    // Verify the form state after setting values
-                                                                                                                                    // setTimeout(() => {
-                                                                                                                                    //     //console.log("Updated form state:", {
-                                                                                                                                    //         symbol: tradeForm.getValues("symbol"),
-                                                                                                                                    //         exchange: tradeForm.getValues("exchange")
-                                                                                                                                    //     });
-                                                                                                                                    // }, 0);
-
-                                                                                                                                    setOpenStockPopover(false);
+                                                                                                                <div style={{
+                                                                                                                    height: filteredStocks.filter(stock => stock.exchange === "NSE").length > 0
+                                                                                                                        ? "120px"
+                                                                                                                        : "200px",
+                                                                                                                }}
+                                                                                                                >
+                                                                                                                    <AutoSizer>
+                                                                                                                        {({ height, width }) => (
+                                                                                                                            <List
+                                                                                                                                height={height}
+                                                                                                                                itemCount={filteredStocks.filter(stock => stock.exchange === "BSE").length}
+                                                                                                                                itemSize={35}
+                                                                                                                                width={width}
+                                                                                                                                itemData={{
+                                                                                                                                    items: filteredStocks.filter(stock => stock.exchange === "BSE"),
+                                                                                                                                    tradeForm,
+                                                                                                                                    setOpenStockPopover,
                                                                                                                                 }}
                                                                                                                             >
-                                                                                                                                {stock.label}
-                                                                                                                            </Button>
-                                                                                                                        ))}
+                                                                                                                                {StockItem}
+                                                                                                                            </List>
+                                                                                                                        )}
+                                                                                                                    </AutoSizer>
                                                                                                                 </div>
                                                                                                             </>
                                                                                                         )}
                                                                                                     </div>
                                                                                                 )}
-                                                                                </div>
-                                                                            </ScrollArea>
+                                                                            </div>
                                                                         </div>
                                                                     </PopoverContent>
                                                                 </Popover>
@@ -898,9 +901,15 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                         type="number"
                                                                         placeholder="Quantity"
                                                                         {...field}
-                                                                        value={field.value === undefined ? "" : field.value}
+                                                                        value={
+                                                                            field.value === undefined
+                                                                                ? ""
+                                                                                : field.value
+                                                                        }
                                                                         onChange={(e) => {
-                                                                            const value = e.target.value === "" ? undefined : Number(e.target.value);
+                                                                            const value = e.target.value === ""
+                                                                                ? undefined
+                                                                                : Number(e.target.value);
                                                                             field.onChange(value);
                                                                         }}
                                                                     />
@@ -952,9 +961,15 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                         placeholder="Price"
                                                                         step="0.01"
                                                                         {...field}
-                                                                        value={field.value === undefined ? "" : field.value}
+                                                                        value={
+                                                                            field.value === undefined
+                                                                                ? ""
+                                                                                : field.value
+                                                                        }
                                                                         onChange={(e) => {
-                                                                            const value = e.target.value === "" ? undefined : Number(e.target.value);
+                                                                            const value = e.target.value === ""
+                                                                                ? undefined
+                                                                                : Number(e.target.value);
                                                                             field.onChange(value);
                                                                         }}
                                                                     />
@@ -1010,6 +1025,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                 )}
                     </div>
                 </ScrollArea>
+
                 <DialogFooter className="">
                     <div className="w-full flex items-center justify-end gap-2">
                         <Button

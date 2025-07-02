@@ -124,11 +124,7 @@ const ClientDetail: React.FC = () => {
                 </div>
 
                 <div className="flex-col md:flex md:flex-row gap-2 mt-3 md:mt-0">
-                    <AddPayment
-                        name="Add Payment"
-                        clientId={clientId}
-                        onSuccess={handlePaymentSuccess}
-                    />
+
                     <Button
                         className="ml-auto mx-3 md:mx-0 bg-transparent shadow-none text-red-400 border border-red-300 hover:bg-red-50 px-10 rounded-xl"
                         onClick={() => setIsDeleteDialogOpen(true)}
@@ -234,6 +230,13 @@ const ClientDetail: React.FC = () => {
                             <ArrowUpRight size={15} />
                         </div>
                     </Link>
+                    <div className="flex gap-2 items-center">
+                        <AddPayment
+                            name="Add Payment"
+                            clientId={clientId}
+                            onSuccess={handlePaymentSuccess}
+                        />
+                    </div>
                     <Link href={`/admin/payment-history?clientId=${client.id}`} className="flex gap-2 items-center hover:bg-secondary rounded-full px-2 py-1 cursor-pointer">
                         <span className="text-sm">Payment</span>
                         <div className="bg-primary text-white h-fit p-2 rounded-full">

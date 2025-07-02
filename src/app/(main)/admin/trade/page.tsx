@@ -71,7 +71,6 @@ const TradePage: React.FC = () => {
 
     useEffect(() => {
         updateUrlWithFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [clientId, searchTerm, tradeType, currentPage, dateRange]);
 
     const filterParams: TradeFilterRequest = {
@@ -99,11 +98,16 @@ const TradePage: React.FC = () => {
         staleTime: 30000, // 30 seconds
     });
 
+    // Log the response for debugging
+    console.log("Trades response:", tradesResponse);
+
     // Get trade data and pagination from response
     const trades = tradesResponse?.data || [];
-    const pagination = tradesResponse?.pagination || {
+
+    // Access pagination data - API returns pagination mapped from metadata
+    const pagination = (tradesResponse as any)?.pagination || {
         total: 0,
-        page: currentPage,
+        currentPage,
         pageSize: PAGE_LIMIT,
         totalPages: 0,
     };
@@ -123,7 +127,7 @@ const TradePage: React.FC = () => {
     // Handle date range changes
     const handleDateChange = (range: MonthRange) => {
         setDateRange(range);
-        setCurrentPage(1); // Reset to first page on filter change
+        setCurrentPage(1);
     };
 
     // Handle page change
@@ -133,16 +137,21 @@ const TradePage: React.FC = () => {
 
     // Handle trade type filter
     const handleTradeTypeChange = (value: string) => {
-        // If "ALL" is selected, set tradeType to empty string to show all trades
         if (value === "ALL") {
             setTradeType("");
         } else {
             setTradeType(value as "BUY" | "SELL");
         }
-        setCurrentPage(1); // Reset to first page on filter change
+        setCurrentPage(1);
     };
 
-    // Handle client ID filter changes
+    function formatDate(date: Date): string {
+        const dd = String(date.getDate()).padStart(2, "0");
+        const mm = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-indexed
+        const yyyy = date.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    }
+
     const handleClientIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         if (value === "") {
@@ -153,10 +162,9 @@ const TradePage: React.FC = () => {
                 setClientId(numValue);
             }
         }
-        setCurrentPage(1); // Reset to first page on filter change
+        setCurrentPage(1);
     };
 
-    // Show error toast if API request fails
     useEffect(() => {
         if (isError && error) {
             const errorMessage = error instanceof Error
@@ -182,7 +190,10 @@ const TradePage: React.FC = () => {
                             to={dateRange.to?.toISOString()}
                         />
                     </div>
-                    <AddTrade name="Add Trade" onSuccess={() => refetch()} />
+                    <AddTrade
+                        name="Add Trade"
+                        onSuccess={() => refetch()}
+                    />
                 </div>
             </div>
 
@@ -264,12 +275,12 @@ const TradePage: React.FC = () => {
                                             {filteredTrades.map((trade, index) => {
                                             // Format the date for display
                                                 const tradeDate = trade.tradeDate instanceof Date
-                                                    ? trade.tradeDate.toLocaleDateString()
-                                                    : new Date(trade.tradeDate).toLocaleDateString();
+                                                    ? formatDate(trade.tradeDate)
+                                                    : formatDate(new Date(trade.tradeDate));
 
                                                 return (
                                                     <TableRow key={trade.id} className="w-full py-10 gap-4 mx-3">
-                                                        <TableCell>{(pagination.page - 1) * pagination.pageSize + index + 1}</TableCell>
+                                                        <TableCell>{(pagination.currentPage - 1) * PAGE_LIMIT + index + 1}</TableCell>
                                                         <TableCell>{trade.clientId}</TableCell>
                                                         <TableCell>{trade.symbol}</TableCell>
                                                         <TableCell>{trade.exchange}</TableCell>
@@ -300,11 +311,13 @@ const TradePage: React.FC = () => {
                                 </div>
                             )}
 
-                <Pagination
-                    currentPage={pagination.page}
-                    totalPages={pagination.totalPages}
-                    onPageChange={handlePageChange}
-                />
+                {pagination.totalPages > 1 && (
+                    <Pagination
+                        currentPage={pagination.currentPage}
+                        totalPages={pagination.totalPages}
+                        onPageChange={handlePageChange}
+                    />
+                )}
             </div>
 
         </div>

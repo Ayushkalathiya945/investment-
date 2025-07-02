@@ -304,7 +304,7 @@ const PaymentHistory: React.FC = () => {
                         />
                     </div>
                     <AddPayment
-                        name="+Add Payment"
+                        name="Add Payment"
                         clientId={selectedClientId} // Only pass clientId if it's actually selected
                         onSuccess={handlePaymentAdded}
                     />
@@ -377,8 +377,8 @@ const PaymentHistory: React.FC = () => {
                     </Table>
                 </div>
 
-                {/* Only show pagination if we have items or we're not in an error state */}
-                {!error && (
+                {/* Only show pagination if we have more than one page and no errors */}
+                {!error && totalPages > 1 && (
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}

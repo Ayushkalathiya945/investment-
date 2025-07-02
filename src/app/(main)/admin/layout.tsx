@@ -54,7 +54,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 {/* Mobile sidebar */}
                 <div
                     className={cn(
-                        "fixed inset-0 z-10 transition-transform duration-300 h-screen lg:hidden",
+                        "fixed inset-0 z-11 transition-transform duration-300 h-screen lg:hidden",
                         sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none",
                     )}
                     onClick={() => setSidebarOpen(false)}

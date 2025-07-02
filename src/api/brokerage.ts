@@ -18,21 +18,6 @@ export async function calculateBrokerage(data: BrokerageCalculateRequest): Promi
     }
 }
 
-/**
- * Fetches filtered brokerage records with pagination
- *
- * @param filters - Object containing filter parameters:
- * - page: Current page number
- * - limit: Records per page
- * - clientId: (optional) Filter by client ID
- * - month: (optional) Filter by month (1-12)
- * - quarter: (optional) Filter by quarter (1-4)
- * - year: (optional) Filter by year
- * - from: (optional) Start date in YYYY-MM-DD format
- * - to: (optional) End date in YYYY-MM-DD format
- *
- * @returns Promise with brokerage data and metadata
- */
 export async function getBrokerageRecords(filters: BrokerageFilterRequest): Promise<{
     success: boolean;
     data: BrokerageItem[];
@@ -41,6 +26,7 @@ export async function getBrokerageRecords(filters: BrokerageFilterRequest): Prom
         total: number;
         hasNext: boolean;
         totalPages: number;
+        currentPage: number;
     };
 }> {
     // console.log(`Fetching brokerage records with filters:`, filters);
@@ -62,6 +48,7 @@ export async function getBrokerageRecords(filters: BrokerageFilterRequest): Prom
                 total: number;
                 hasNext: boolean;
                 totalPages: number;
+                currentPage: number;
             };
         }>("/brokerage/get-all", {
             ...filters,
@@ -69,25 +56,18 @@ export async function getBrokerageRecords(filters: BrokerageFilterRequest): Prom
         } as unknown as Record<string, unknown>);
 
         return response;
-    } catch (error: any) {
+    } catch (error) {
         console.error("Error fetching brokerage records:", error);
-        throw new Error(error.message || "Failed to fetch brokerage records");
+        throw new Error(`${error}` || "Failed to fetch brokerage records");
     }
 }
 
-/**
- * Fetches all periodic brokerage records for all clients, sorted from latest to oldest
- * Returns client name, brokerage amount, and date based on period type
- *
- * @param periodType - Type of period (month, quarter)
- * @param period - Optional period number (quarter 1-4 or month 1-12) based on periodType
- * @param year - Optional year for filtering data
- * @returns Promise with brokerage data
- */
 export async function getAllPeriodicBrokerage(
     periodType: PeriodType = PeriodType.MONTH,
     period?: number,
     year?: number,
+    page: number = 1,
+    limit: number = 20,
 ): Promise<{
         success: boolean;
         data: BrokerageItem[];
@@ -96,13 +76,14 @@ export async function getAllPeriodicBrokerage(
             total: number;
             hasNext: boolean;
             totalPages: number;
+            currentPage: number;
         };
     }> {
     try {
         // Create a filter object based on period type
         const filters: BrokerageFilterRequest = {
-            page: 1,
-            limit: 1000, // Use a large limit to get all records
+            page,
+            limit,
         };
 
         // Add period-specific filters (quarter or month) based on periodType

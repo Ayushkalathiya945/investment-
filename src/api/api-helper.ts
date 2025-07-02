@@ -1,7 +1,8 @@
-// utils/apiClient.ts
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 
 import axios from "axios";
+
+// utils/apiClient.ts
 
 // Define a custom error class for API errors with additional properties
 export class ApiError extends Error {
@@ -18,13 +19,7 @@ export class ApiError extends Error {
     }
 }
 
-// Define API base URL using a default value instead of direct env access
-// This avoids the node/no-process-env linting error
-export const BASE_URL = `${
-    // Use a fallback URL if env is not available
-    typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
-}/api`;
-
+export const BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api`;
 // Create Axios instance
 const apiClient: AxiosInstance = axios.create({
     baseURL: BASE_URL,
@@ -131,8 +126,34 @@ export async function ApiPostFormData<T>(url: string, formData: FormData, config
         useAuth,
     );
 
-    const response = await apiClient.post<T>(url, formData, finalConfig);
-    return response.data;
+    try {
+        const response = await apiClient.post<T>(url, formData, finalConfig);
+        return response.data;
+    } catch (error: any) {
+        // Extract detailed error message from the response
+        const responseData = error.response?.data;
+
+        // Determine the most specific error message
+        let errorMessage: string;
+
+        // When using Hono's HTTPException with structured validation error response
+        if (typeof responseData === "object" && responseData?.error) {
+            errorMessage = responseData.error;
+        } else if (typeof responseData === "object" && responseData?.message) {
+            errorMessage = responseData.message;
+        } else if (typeof responseData === "string") {
+            errorMessage = responseData;
+        } else {
+            errorMessage = error.message || `Request to ${url} failed`;
+        }
+
+        console.error(`API FormData POST Error for ${url}:`, errorMessage);
+
+        const status = error.response?.status || 500;
+
+        // Use our custom ApiError class with the proper error message
+        throw new ApiError(errorMessage, status, responseData, responseData?.error);
+    }
 }
 
 // Utility function for PUT requests with JSON data

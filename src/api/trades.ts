@@ -38,6 +38,8 @@ export function formatDateForTradeApi(date: Date | undefined): string | undefine
 // Create a new trade
 export async function createTrade(data: CreateTradeRequest): Promise<{ data: Trade; message: string }> {
     try {
+        console.log("Creating trade with data:", JSON.stringify(data, null, 2));
+
         const response = await ApiPost<TradeResponse>("/trades/create", data);
 
         if (!response || !response.success) {
@@ -110,9 +112,6 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
 
 // Get all trades with filtering options
 export async function getAllTrades(data: TradeFilterRequest): Promise<TradesListResponse> {
-    // console.log("Fetching all trades with filter data:", data);
-
-    // Ensure all filter values are properly formatted
     const requestData: TradeFilterRequest = {
         page: data.page,
         pageSize: data.pageSize,
@@ -123,17 +122,28 @@ export async function getAllTrades(data: TradeFilterRequest): Promise<TradesList
         to: data.endDate || undefined,
     };
 
-    const response = await ApiPost<TradesListResponse>("/trades/get-all", requestData);
+    console.log(requestData);
+
+    const response = await ApiPost<any>("/trades/get-all", requestData);
 
     if (!response || !response.success) {
         throw new Error("Failed to fetch trades");
     }
 
-    // if (response.data) {
-    //     console.log(`Received ${response.data.length} trades out of ${response.pagination?.total || "unknown"} total`);
-    // }
+    // Map the backend metadata to our expected pagination structure
+    const mappedResponse: TradesListResponse = {
+        ...response,
+        pagination: response.metadata
+            ? {
+                    total: response.metadata.total,
+                    totalPages: response.metadata.totalPages,
+                    currentPage: response.metadata.currentPage,
+                    hasNext: response.metadata.hasNext,
+                }
+            : undefined,
+    };
 
-    return response;
+    return mappedResponse;
 }
 
 // Get a trade by ID

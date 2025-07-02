@@ -1,7 +1,7 @@
 {
     "version": "6",
     "dialect": "sqlite",
-    "id": "b5d2ca2d-2e71-46ed-89a2-b275d61990c9",
+    "id": "6411dc28-88e7-4f58-b60e-e637933e701a",
     "prevId": "00000000-0000-0000-0000-000000000000",
     "tables": {
         "admins": {
@@ -259,7 +259,7 @@
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "cascade",
                     "onUpdate": "no action"
                 },
                 "brokerage_details_trade_id_trades_id_fk": {
@@ -272,7 +272,7 @@
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "cascade",
                     "onUpdate": "no action"
                 }
             },
@@ -420,7 +420,7 @@
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "cascade",
                     "onUpdate": "no action"
                 }
             },
@@ -470,7 +470,7 @@
                     "name": "address",
                     "type": "text",
                     "primaryKey": false,
-                    "notNull": true,
+                    "notNull": false,
                     "autoincrement": false
                 },
                 "created_at": {
@@ -668,7 +668,7 @@
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "cascade",
                     "onUpdate": "no action"
                 },
                 "fifo_allocations_buy_trade_id_trades_id_fk": {
@@ -681,7 +681,20 @@
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "cascade",
+                    "onUpdate": "no action"
+                },
+                "fifo_allocations_client_id_clients_id_fk": {
+                    "name": "fifo_allocations_client_id_clients_id_fk",
+                    "tableFrom": "fifo_allocations",
+                    "tableTo": "clients",
+                    "columnsFrom": [
+                        "client_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "cascade",
                     "onUpdate": "no action"
                 }
             },
@@ -778,111 +791,20 @@
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "cascade",
                     "onUpdate": "no action"
-                }
-            },
-            "compositePrimaryKeys": {},
-            "uniqueConstraints": {},
-            "checkConstraints": {}
-        },
-        "positions": {
-            "name": "positions",
-            "columns": {
-                "id": {
-                    "name": "id",
-                    "type": "integer",
-                    "primaryKey": true,
-                    "notNull": true,
-                    "autoincrement": true
                 },
-                "client_id": {
-                    "name": "client_id",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "symbol": {
-                    "name": "symbol",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "exchange": {
-                    "name": "exchange",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "quantity": {
-                    "name": "quantity",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "average_price": {
-                    "name": "average_price",
-                    "type": "real",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "total_investment": {
-                    "name": "total_investment",
-                    "type": "real",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "first_purchase_date": {
-                    "name": "first_purchase_date",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "last_brokerage_month": {
-                    "name": "last_brokerage_month",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
-                "updated_at": {
-                    "name": "updated_at",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                }
-            },
-            "indexes": {
-                "positions_client_id_symbol_exchange_unique": {
-                    "name": "positions_client_id_symbol_exchange_unique",
-                    "columns": [
-                        "client_id",
-                        "symbol",
-                        "exchange"
-                    ],
-                    "isUnique": true
-                }
-            },
-            "foreignKeys": {
-                "positions_client_id_clients_id_fk": {
-                    "name": "positions_client_id_clients_id_fk",
-                    "tableFrom": "positions",
-                    "tableTo": "clients",
+                "payments_brokerage_id_brokerages_id_fk": {
+                    "name": "payments_brokerage_id_brokerages_id_fk",
+                    "tableFrom": "payments",
+                    "tableTo": "brokerages",
                     "columnsFrom": [
-                        "client_id"
+                        "brokerage_id"
                     ],
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "set null",
                     "onUpdate": "no action"
                 }
             },
@@ -1129,7 +1051,7 @@
                     "columnsTo": [
                         "id"
                     ],
-                    "onDelete": "no action",
+                    "onDelete": "cascade",
                     "onUpdate": "no action"
                 }
             },

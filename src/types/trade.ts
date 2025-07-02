@@ -44,11 +44,11 @@ export type TradesListResponse = {
         issues?: Array<{ path: string; message: string }>;
         message?: string;
     };
-    pagination?: {
+    meatadata?: {
         total: number;
-        page: number;
-        pageSize: number;
+        hasNext: boolean;
         totalPages: number;
+        currentPage: number;
     };
 };
 

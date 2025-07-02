@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
 import type { TransactionType } from "../index";
 import type { ExchangeType, NewFifoAllocation } from "../schema";
@@ -58,4 +58,27 @@ export async function calculateTotalProfitLoss(clientId: number, tx?: Transactio
         .where(eq(fifoAllocations.clientId, clientId));
 
     return result[0]?.totalPnL || 0;
+}
+
+/**
+ * Get all FIFO allocations for a client within a date range
+ * Returns allocations where the sell date is within the given range
+ * @param clientId Client ID to search for
+ * @param startDate Start date (timestamp) for range search
+ * @param endDate End date (timestamp) for range search
+ * @returns Array of FIFO allocation records
+ */
+export async function getFifoAllocationsByDateRange(
+    clientId: number,
+    startDate: number,
+    endDate: number,
+    tx?: TransactionType,
+) {
+    return getDB(tx).select().from(fifoAllocations).where(
+        and(
+            eq(fifoAllocations.clientId, clientId),
+            gte(fifoAllocations.sellDate, startDate),
+            lte(fifoAllocations.sellDate, endDate),
+        ),
+    );
 }

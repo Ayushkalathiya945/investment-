@@ -71,7 +71,7 @@ export enum ExchangeType {
 // Enhanced Trades table - FIXED the typo in isFullySold
 export const trades = sqliteTable("trades", {
     id: int("id").primaryKey({ autoIncrement: true }),
-    clientId: int("client_id").notNull().references(() => clients.id),
+    clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
     symbol: text("symbol").notNull(),
     exchange: text("exchange", {}).notNull(),
     type: text("type", { enum: [TradeType.BUY, TradeType.SELL] }).notNull(),
@@ -112,11 +112,11 @@ export const tradeRelations = relations(trades, ({ one, many }) => {
 // FIFO Allocation table - Enhanced for better tracking
 export const fifoAllocations = sqliteTable("fifo_allocations", {
     id: int("id").primaryKey({ autoIncrement: true }),
-    sellTradeId: int("sell_trade_id").notNull().references(() => trades.id),
-    buyTradeId: int("buy_trade_id").notNull().references(() => trades.id),
+    sellTradeId: int("sell_trade_id").notNull().references(() => trades.id, { onDelete: "cascade" }),
+    buyTradeId: int("buy_trade_id").notNull().references(() => trades.id, { onDelete: "cascade" }),
 
     // Quick access fields (denormalized for performance)
-    clientId: int("client_id").notNull(),
+    clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
     symbol: text("symbol").notNull(),
     exchange: text("exchange", { enum: ["NSE", "BSE"] }).notNull(),
 
@@ -150,7 +150,7 @@ export const fifoAllocationRelations = relations(fifoAllocations, ({ one }) => (
 // Monthly brokerage calculations - Enhanced
 export const brokerages = sqliteTable("brokerages", {
     id: int("id").primaryKey({ autoIncrement: true }),
-    clientId: int("client_id").notNull().references(() => clients.id),
+    clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
     month: int("month").notNull(), // 1-12
     year: int("year").notNull(),
     calculationPeriod: int("calculation_period").notNull(), // YYYYMM format
@@ -187,8 +187,8 @@ export const brokerageRelations = relations(brokerages, ({ one, many }) => {
 // Detailed brokerage breakdown - Enhanced with better calculation tracking
 export const brokerageDetails = sqliteTable("brokerage_details", {
     id: int("id").primaryKey({ autoIncrement: true }),
-    brokerageId: int("brokerage_id").notNull().references(() => brokerages.id),
-    tradeId: int("trade_id").notNull().references(() => trades.id),
+    brokerageId: int("brokerage_id").notNull().references(() => brokerages.id, { onDelete: "cascade" }),
+    tradeId: int("trade_id").notNull().references(() => trades.id, { onDelete: "cascade" }),
 
     // Position details
     symbol: text("symbol").notNull(),
@@ -235,12 +235,12 @@ export const brokerageDetailsRelations = relations(brokerageDetails, ({ one }) =
 // Payments table - simplified
 export const payments = sqliteTable("payments", {
     id: int("id").primaryKey({ autoIncrement: true }),
-    clientId: int("client_id").notNull().references(() => clients.id),
+    clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
     amount: real("amount").notNull(),
     paymentType: text("payment_type", { enum: ["brokerage", "other"] }).notNull().default("other"),
     description: text("description"),
     paymentDate: int("payment_date", { mode: "timestamp" }).notNull(),
-    brokerageId: int("brokerage_id"), // Reference to brokerage payment
+    brokerageId: int("brokerage_id").references(() => brokerages.id, { onDelete: "set null" }), // Reference to brokerage payment
     notes: text("notes"),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 }, table => [

@@ -10,7 +10,6 @@ import { ApiPost } from "./api-helper";
 
 export async function createPayment(data: PaymentCreateRequest): Promise<Payment> {
     try {
-        // Validate required fields before making API call
         if (!data.clientId) {
             throw new Error("Client ID is required");
         }
@@ -31,7 +30,6 @@ export async function createPayment(data: PaymentCreateRequest): Promise<Payment
     } catch (error: any) {
         console.error("Payment creation API error:", error);
 
-        // Check if error is a ZodError with validation issues
         if (error?.error?.issues) {
             const issues = error.error.issues;
             const messages = issues.map((issue: any) =>
@@ -45,7 +43,6 @@ export async function createPayment(data: PaymentCreateRequest): Promise<Payment
 }
 
 export async function getAllPayments(data: PaymentFilterRequest): Promise<PaymentsListResponse> {
-    // Make a clean copy of the request data
     const requestData = {
         page: data.page,
         limit: data.limit,

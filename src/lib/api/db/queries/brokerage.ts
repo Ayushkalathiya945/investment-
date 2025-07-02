@@ -1,9 +1,9 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { PeriodType } from "@/types/brokerage";
 
 import type { TransactionType } from "../index";
-import type { NewBrokerage } from "../schema";
+import type { Brokerage, Client, NewBrokerage, NewBrokerageDetail } from "../schema";
 
 import { getDB } from "../index";
 import { brokerageDetails, brokerages, clients } from "../schema";
@@ -34,9 +34,7 @@ export async function findOne(data: { id: number }, tx?: TransactionType) {
 
 export async function findAllWithPagination(data: { page: number; limit: number; clientId?: number; from?: number; to?: number; month?: number; quarter?: number; year?: number }, tx?: TransactionType) {
     const conditions = [];
-    console.log("Brokerage query params:", data);
 
-    // Client filter
     if (data.clientId) {
         console.log(`Filtering by client ID: ${data.clientId}`);
         conditions.push(eq(brokerages.clientId, data.clientId));
@@ -46,7 +44,6 @@ export async function findAllWithPagination(data: { page: number; limit: number;
     let quarterValue = 0;
     let quarterYear = 0;
 
-    // Date range filter (from/to)
     if (data.from && data.to) {
         const fromMonth = new Date(data.from).getMonth() + 1;
         const toMonth = new Date(data.to).getMonth() + 1;
@@ -55,8 +52,7 @@ export async function findAllWithPagination(data: { page: number; limit: number;
 
         conditions.push(gte(brokerages.month, fromMonth));
         conditions.push(lte(brokerages.month, toMonth));
-    } else if (data.quarter && data.year) { // Quarter filter
-        // Validate quarter input (must be 1-4)
+    } else if (data.quarter && data.year) {
         const quarter = Math.max(1, Math.min(4, data.quarter));
 
         if (quarter !== data.quarter) {
@@ -67,25 +63,22 @@ export async function findAllWithPagination(data: { page: number; limit: number;
         quarterValue = quarter;
         quarterYear = data.year;
 
-        const startMonth = (quarter - 1) * 3 + 1; // 1, 4, 7, 10
-        const endMonth = quarter * 3; // 3, 6, 9, 12
+        const startMonth = (quarter - 1) * 3 + 1;
+        const endMonth = quarter * 3;
 
         console.log(`Quarter filter: Q${quarter} ${data.year} (months ${startMonth}-${endMonth})`);
 
-        // Quarter filtering logic
         conditions.push(eq(brokerages.year, data.year));
         conditions.push(gte(brokerages.month, startMonth));
         conditions.push(lte(brokerages.month, endMonth));
-    } else if (data.month && data.year) { // Month filter
-        console.log(`Month filter: ${data.month}/${data.year}`);
+    } else if (data.month && data.year) {
         conditions.push(eq(brokerages.month, data.month));
         conditions.push(eq(brokerages.year, data.year));
     }
 
-    // Query the database with the constructed conditions
     const brokerageData = await getDB(tx).query.brokerages.findMany({
         with: {
-            client: true, // Include client information
+            client: true,
         },
         where: and(...conditions),
         orderBy: [desc(brokerages.year), desc(brokerages.month)],
@@ -101,7 +94,6 @@ export async function findAllWithPagination(data: { page: number; limit: number;
     let count = brokerageCount && brokerageCount.length > 0 ? brokerageCount[0].count : 0;
     let resultBrokerage = brokerageData;
 
-    // For quarterly data with no results, make sure we return data for all clients with zero brokerage
     if (isQuarterlyFilter && brokerageData.length === 0) {
         console.log(`No brokerage data found for quarter ${quarterValue} ${quarterYear}. Getting all clients with zero amounts...`);
 
@@ -111,24 +103,19 @@ export async function findAllWithPagination(data: { page: number; limit: number;
 
         // If we have a client filter, apply it here too
         const filteredClients = data.clientId
-            ? allClients.filter((client: { id: number }) => client.id === data.clientId)
+            ? allClients.filter((client: { id: number; name: string }) => client.id === data.clientId)
             : allClients;
 
-        // Create synthetic records for each client with zero brokerage amount
-        const syntheticRecords = filteredClients.map((client: { id: number }) => {
-            // Calculate months for this quarter
-            const startMonth = (quarterValue - 1) * 3 + 1; // 1, 4, 7, 10
-
-            // Get the current timestamp
+        const syntheticRecords = filteredClients.map((client: { id: number; name: string }) => {
+            const startMonth = (quarterValue - 1) * 3 + 1;
             const currentTimestamp = Date.now();
             const currentDate = new Date();
 
-            // Create a synthetic record that matches the brokerages schema
             return {
-                id: 0, // Synthetic record
+                id: 0,
                 clientId: client.id,
-                client, // Include client object for consistency with query results
-                month: startMonth, // Use first month of quarter
+                client,
+                month: startMonth,
                 year: quarterYear,
                 calculationPeriod: Number.parseInt(`${quarterYear}${startMonth.toString().padStart(2, "0")}`),
                 brokerageRate: 10,
@@ -184,21 +171,13 @@ export async function calculateTotalbrokerageAmount(data: {
         // Validate quarter input (must be 1-4)
         const quarter = Math.max(1, Math.min(4, data.quarter));
 
-        if (quarter !== data.quarter) {
-            console.warn(`[WARN] Invalid quarter value ${data.quarter} provided, using ${quarter} instead`);
-        }
-
         const startMonth = (quarter - 1) * 3 + 1; // 1, 4, 7, 10
         const endMonth = quarter * 3; // 3, 6, 9, 12
 
-        console.log(`[DEBUG] Quarter filter for totals: Q${quarter} ${data.year} (months ${startMonth}-${endMonth})`);
-
-        // Quarter filtering logic
         conditions.push(eq(brokerages.year, data.year));
         conditions.push(gte(brokerages.month, startMonth));
         conditions.push(lte(brokerages.month, endMonth));
-    } else if (data.month && data.year) { // Month filter
-        console.log(`[DEBUG] Month filter for totals: ${data.month}/${data.year}`);
+    } else if (data.month && data.year) {
         conditions.push(eq(brokerages.month, data.month));
         conditions.push(eq(brokerages.year, data.year));
     }
@@ -216,10 +195,6 @@ export async function calculateTotalbrokerageAmount(data: {
             query.where(and(...conditions));
         }
 
-        // Log the SQL for debugging
-        const querySQL = query.toSQL();
-        console.log("[DEBUG] Brokerage total SQL:", querySQL.sql, querySQL.params);
-
         // Execute the query
         const totalbrokerageAmount = await query;
 
@@ -233,9 +208,6 @@ export async function calculateTotalbrokerageAmount(data: {
     }
 }
 
-// Get all periodic brokerage records for all clients, sorted from latest to oldest
-// Returns client name, brokerage amount, and date based on periodType
-// Optional filtering by specific quarter and year for quarterly reports
 export async function getAllPeriodicBrokerage(
     periodType: PeriodType,
     tx?: TransactionType,
@@ -531,7 +503,16 @@ export async function getAllPeriodicBrokerage(
     }
 
     // Format the results to include a proper date string
-    return (result || []).map((record: any) => {
+    return (result || []).map((record: {
+        id?: number;
+        clientId?: number;
+        clientName?: string;
+        brokerageAmount?: number;
+        month?: number;
+        quarter?: number | string;
+        year?: number | string;
+        calculatedAt?: number;
+    }) => {
         const monthNames = [
             "January",
             "February",
@@ -605,11 +586,9 @@ export async function getAllPeriodicBrokerage(
             periodType,
             calculatedAt: record.calculatedAt || Date.now(),
         };
-    }).filter(Boolean); // Remove any null entries
+    }).filter(Boolean);
 }
 
-// Get all monthly brokerage records for all clients, sorted from latest to oldest
-// Returns client name, brokerage amount, and date (month-year)
 export async function getAllMonthlyBrokerage(tx?: TransactionType): Promise<{
     id: number;
     clientId: number;
@@ -646,6 +625,17 @@ export async function getAllMonthlyBrokerage(tx?: TransactionType): Promise<{
         year: number;
         calculatedAt: number;
     }) => {
+        type BrokerageRecord = {
+            id: number;
+            clientId: number;
+            clientName: string;
+            brokerageAmount: number;
+            month: number;
+            year: number;
+            calculatedAt: number;
+            date: string;
+        };
+
         const monthNames = [
             "January",
             "February",
@@ -660,29 +650,21 @@ export async function getAllMonthlyBrokerage(tx?: TransactionType): Promise<{
             "November",
             "December",
         ];
-        const monthName = monthNames[record.month - 1] || "Unknown";
+
+        // Handle potentially invalid month values
+        const monthIndex = typeof record.month === "number" ? Math.max(0, Math.min(11, record.month - 1)) : 0;
+        const monthName = monthNames[monthIndex] || "Unknown";
 
         return {
             ...record,
             date: `${monthName} ${record.year}`,
-        };
+        } as BrokerageRecord;
     });
 }
 
-/**
- * Save detailed brokerage records to the database
- *
- * This function handles the creation of individual brokerage detail records for each
- * position a client holds, providing a transparent breakdown of how brokerage was calculated.
- *
- * @param brokerageId - ID of the parent brokerage record
- * @param details - Array of brokerage detail objects
- * @param tx - Optional transaction context
- * @returns Promise<void>
- */
 export async function saveBrokerageDetails(
     brokerageId: number,
-    details: Array<any>,
+    details: Array<Partial<NewBrokerageDetail>>,
     tx?: TransactionType,
 ): Promise<void> {
     const db = getDB(tx);
@@ -693,23 +675,22 @@ export async function saveBrokerageDetails(
 
         // Only proceed with insert if there are details to save
         if (details.length > 0) {
-            // Map the details to the database schema structure
+            // Use map to transform all details in a single pass
             const detailsToInsert = details.map((detail) => {
                 // Ensure totalDaysInMonth is not zero to prevent division by zero
-                const totalDays = detail.totalDaysInMonth > 0 ? detail.totalDaysInMonth : 30;
+                const totalDays = detail.totalDaysInMonth && detail.totalDaysInMonth > 0 ? detail.totalDaysInMonth : 30;
 
-                // Debug each detail record
-                console.log(`    📋 Processing detail record: ${detail.symbol} (ID: ${detail.tradeId})`);
+                // Safely access symbol with a fallback for type safety
+                const symbol = detail.symbol || "unknown";
 
                 // Handle all date fields safely with detailed context - convert to Date objects
                 const dateFields = {
-                    buyDate: safeDate(detail.buyDate, `Symbol: ${detail.symbol} - buyDate`),
-                    holdingStartDate: safeDate(detail.holdingStartDate, `Symbol: ${detail.symbol} - holdingStartDate`),
-                    holdingEndDate: safeDate(detail.holdingEndDate, `Symbol: ${detail.symbol} - holdingEndDate`),
-                    sellDate: detail.sellDate ? safeDate(detail.sellDate, `Symbol: ${detail.symbol} - sellDate`) : null,
+                    buyDate: safeDate(detail.buyDate, `Symbol: ${symbol} - buyDate`),
+                    holdingStartDate: safeDate(detail.holdingStartDate, `Symbol: ${symbol} - holdingStartDate`),
+                    holdingEndDate: safeDate(detail.holdingEndDate, `Symbol: ${symbol} - holdingEndDate`),
+                    sellDate: detail.sellDate ? safeDate(detail.sellDate, `Symbol: ${symbol} - sellDate`) : null,
                 };
 
-                // Ensure all values are in correct format for the database
                 try {
                     return {
                         brokerageId,
@@ -717,27 +698,28 @@ export async function saveBrokerageDetails(
                         symbol: detail.symbol,
                         exchange: detail.exchange,
                         quantity: detail.quantity,
-                        buyPrice: detail.buyPrice,
+                        buyPrice: detail.buyPrice ? Number(detail.buyPrice.toFixed(2)) : 0,
                         // Convert all date fields to Date objects
                         buyDate: dateFields.buyDate,
                         holdingStartDate: dateFields.holdingStartDate,
                         holdingEndDate: dateFields.holdingEndDate,
                         holdingDays: detail.holdingDays,
                         totalDaysInMonth: totalDays,
-                        positionValue: detail.positionValue,
+                        positionValue: detail.positionValue ? Number(detail.positionValue.toFixed(2)) : 0,
                         monthlyBrokerageRate: 10, // 10% per month (fixed rate)
-                        dailyBrokerageRate: 10 / totalDays,
-                        brokerageAmount: detail.brokerageAmount,
+                        dailyBrokerageRate: Number((10 / totalDays).toFixed(2)),
+                        brokerageAmount: detail.brokerageAmount ? Number(detail.brokerageAmount.toFixed(2)) : 0,
                         calculationFormula: detail.calculationFormula,
                         // Handle optional fields for sold positions
                         isSoldInMonth: detail.isSoldInMonth || 0,
                         sellDate: dateFields.sellDate,
-                        sellPrice: detail.sellPrice || null,
-                        sellValue: detail.sellValue || null,
+                        sellPrice: detail.sellPrice ? Number(detail.sellPrice.toFixed(2)) : null,
+                        sellValue: detail.sellValue ? Number(detail.sellValue.toFixed(2)) : null,
                         createdAt: new Date(), // Use Date object for createdAt as well
                     };
                 } catch (err) {
-                    console.error(`      ⚠️ Error creating brokerage detail record for ${detail.symbol}: ${err}`);
+                    // Minimal error logging
+                    console.error(`${err} :  Error creating brokerage detail record for ${detail.symbol}`);
                     // Return a safe fallback record in case of errors
                     const now = new Date();
                     return {
@@ -746,16 +728,16 @@ export async function saveBrokerageDetails(
                         symbol: detail.symbol,
                         exchange: detail.exchange,
                         quantity: detail.quantity,
-                        buyPrice: detail.buyPrice,
+                        buyPrice: detail.buyPrice ? Number(detail.buyPrice.toFixed(2)) : 0,
                         buyDate: now,
                         holdingStartDate: now,
                         holdingEndDate: now,
                         holdingDays: detail.holdingDays,
                         totalDaysInMonth: totalDays,
-                        positionValue: detail.positionValue,
+                        positionValue: detail.positionValue ? Number(detail.positionValue.toFixed(2)) : 0,
                         monthlyBrokerageRate: 10,
-                        dailyBrokerageRate: 10 / totalDays,
-                        brokerageAmount: detail.brokerageAmount,
+                        dailyBrokerageRate: Number((10 / totalDays).toFixed(2)),
+                        brokerageAmount: detail.brokerageAmount ? Number(detail.brokerageAmount.toFixed(2)) : 0,
                         calculationFormula: detail.calculationFormula,
                         isSoldInMonth: 0,
                         sellDate: null,
@@ -767,37 +749,17 @@ export async function saveBrokerageDetails(
             });
 
             try {
-                // Log each detail briefly for debugging
-                detailsToInsert.forEach((detail, index) => {
-                    console.log(`      🔹 [${index + 1}/${detailsToInsert.length}] Detail: ${detail.symbol}, Date types: buyDate=${detail.buyDate instanceof Date ? "Date" : typeof detail.buyDate}, holdingStartDate=${detail.holdingStartDate instanceof Date ? "Date" : typeof detail.holdingStartDate}, holdingEndDate=${detail.holdingEndDate instanceof Date ? "Date" : typeof detail.holdingEndDate}, sellDate=${detail.sellDate instanceof Date ? "Date" : detail.sellDate === null ? "null" : typeof detail.sellDate}`);
-                });
-
-                // Insert all details in a single operation
+                // Insert all details in a single batch operation
                 await db.insert(brokerageDetails).values(detailsToInsert);
 
-                console.log(`    ✓ Saved ${detailsToInsert.length} brokerage detail records`);
+                // Minimal logging
+                // console.log(`Saved ${detailsToInsert.length} brokerage details`);
             } catch (insertError) {
                 // Detailed error logging
                 console.error(`    ❌ Database insert error: ${insertError}`);
 
                 // Try to insert one by one to isolate the problematic record
                 console.error(`    🔄 Attempting individual record inserts to isolate problematic records...`);
-                let successCount = 0;
-
-                for (let i = 0; i < detailsToInsert.length; i++) {
-                    try {
-                        await db.insert(brokerageDetails).values([detailsToInsert[i]]);
-                        successCount++;
-                    } catch (singleInsertError) {
-                        console.error(`      ❌ Error with record #${i + 1} (${detailsToInsert[i].symbol}): ${singleInsertError}`);
-                    }
-                }
-
-                if (successCount > 0) {
-                    console.error(`    ⚠️ Partially succeeded: ${successCount}/${detailsToInsert.length} records saved`);
-                } else {
-                    throw new Error(`Failed to save any brokerage details: ${insertError}`);
-                }
             }
         } else {
             console.error(`    ⚠️ No brokerage details to save for brokerage ID ${brokerageId}`);
@@ -809,15 +771,151 @@ export async function saveBrokerageDetails(
     }
 }
 
-/**
- * Safely converts various date formats to a Date object for database storage
- * Handles edge cases and provides verbose debugging
- *
- * @param value - Value to convert (can be Date, number, string or null)
- * @param debugContext - Optional context for logging
- * @returns Date - Date object, or current date if conversion not possible
- */
-function safeDate(value: any, debugContext: string = ""): Date {
+export async function createWithDetails(
+    brokerageData: NewBrokerage,
+    detailsList: Array<Partial<NewBrokerageDetail>>,
+    tx?: TransactionType,
+) {
+    const db = getDB(tx);
+    const [brokerage] = await db.insert(brokerages).values(brokerageData).returning();
+
+    if (detailsList.length > 0) {
+        await saveBrokerageDetails(brokerage.id, detailsList, tx);
+    }
+
+    return brokerage;
+}
+export async function batchSaveClientBrokerages(
+    clientBrokerages: Array<{
+        clientData: Partial<Client>;
+        brokerageData: NewBrokerage;
+        detailsData: Array<Partial<NewBrokerageDetail>>;
+    }>,
+    tx?: TransactionType,
+) {
+    const db = getDB(tx);
+
+    // Collect all brokerage data and format numeric values to 2 decimal places
+    const brokerageDataList = clientBrokerages.map((c) => {
+        // Format numeric values to 2 decimal places
+        const formattedData = {
+            ...c.brokerageData,
+            brokerageAmount: c.brokerageData.brokerageAmount ? Number(c.brokerageData.brokerageAmount.toFixed(2)) : 0,
+            totalHoldingValue: c.brokerageData.totalHoldingValue ? Number(c.brokerageData.totalHoldingValue.toFixed(2)) : 0,
+            brokerageRate: c.brokerageData.brokerageRate ? Number(c.brokerageData.brokerageRate.toFixed(2)) : 10,
+        };
+        return formattedData;
+    });
+
+    // Batch insert brokerages with conflict update
+    const insertedBrokerages = await db.insert(brokerages)
+        .values(brokerageDataList)
+        .onConflictDoUpdate({
+            target: [brokerages.clientId, brokerages.calculationPeriod],
+            set: {
+                totalHoldingValue: sql`ROUND(excluded.total_holding_value, 2)`,
+                totalHoldingDays: sql`excluded.total_holding_days`,
+                brokerageAmount: sql`ROUND(excluded.brokerage_amount, 2)`,
+                totalPositions: sql`excluded.total_positions`,
+                calculatedAt: sql`excluded.calculated_at`,
+            },
+        })
+        .returning();
+
+    // Prepare all brokerage details for batch insert
+    const allDetailsToInsert: Array<Omit<NewBrokerageDetail, "id">> = [];
+
+    // Process batch details - first delete existing details for all brokerages
+    const brokerageIds = insertedBrokerages.map((b: Brokerage) => b.id);
+
+    if (brokerageIds.length > 0) {
+        try {
+            // Delete existing details for these brokerages
+            await db.delete(brokerageDetails)
+                .where(inArray(brokerageDetails.brokerageId, brokerageIds));
+
+            // Process each brokerage's details
+            insertedBrokerages.forEach((insertedBrokerage: Brokerage, index: number) => {
+                const original = clientBrokerages[index];
+
+                if (original.detailsData.length === 0) {
+                    return; // Skip if no details
+                }
+
+                const brokerageId = insertedBrokerage.id;
+
+                // Process each detail - prepare for batch insert
+                original.detailsData.forEach((detail) => {
+                    // Ensure totalDaysInMonth is not zero to prevent division by zero
+                    const totalDays = detail.totalDaysInMonth && detail.totalDaysInMonth > 0
+                        ? detail.totalDaysInMonth
+                        : 30;
+
+                    // Safely access symbol with a fallback for type safety
+                    const symbol = detail.symbol || "unknown";
+
+                    try {
+                        // Convert dates to numeric timestamps as required by the schema
+                        const buyDateObj = safeDate(detail.buyDate, `Symbol: ${symbol} - buyDate`);
+                        const holdingStartDateObj = safeDate(detail.holdingStartDate, `Symbol: ${symbol} - holdingStartDate`);
+                        const holdingEndDateObj = safeDate(detail.holdingEndDate, `Symbol: ${symbol} - holdingEndDate`);
+                        const sellDateObj = detail.sellDate ? safeDate(detail.sellDate, `Symbol: ${symbol} - sellDate`) : null;
+
+                        // Timestamp conversion - SQLite expects integers for dates
+                        const buyDate = buyDateObj.getTime();
+                        const holdingStartDate = holdingStartDateObj.getTime();
+                        const holdingEndDate = holdingEndDateObj.getTime();
+                        const sellDate = sellDateObj ? sellDateObj.getTime() : null;
+                        const createdAt = new Date();
+
+                        // Add to batch array
+                        allDetailsToInsert.push({
+                            brokerageId,
+                            tradeId: detail.tradeId!,
+                            symbol,
+                            exchange: detail.exchange!,
+                            quantity: detail.quantity!,
+                            buyPrice: detail.buyPrice!,
+                            buyDate,
+                            holdingStartDate,
+                            holdingEndDate,
+                            holdingDays: detail.holdingDays!,
+                            totalDaysInMonth: totalDays,
+                            positionValue: detail.positionValue ? Number(detail.positionValue.toFixed(2)) : 0,
+                            monthlyBrokerageRate: 10, // 10% per month (fixed rate)
+                            dailyBrokerageRate: Number((10 / totalDays).toFixed(2)),
+                            brokerageAmount: detail.brokerageAmount ? Number(detail.brokerageAmount.toFixed(2)) : 0,
+                            calculationFormula: detail.calculationFormula,
+                            isSoldInMonth: detail.isSoldInMonth || 0,
+                            sellDate,
+                            sellPrice: detail.sellPrice ? Number(detail.sellPrice.toFixed(2)) : null,
+                            sellValue: detail.sellValue ? Number(detail.sellValue.toFixed(2)) : null,
+                            createdAt,
+                        });
+                    } catch (err) {
+                        console.error(`Error preparing detail for ${symbol}: ${err}`);
+                    }
+                });
+            });
+
+            // Then insert all details in one batch if we have any
+            if (allDetailsToInsert.length > 0) {
+                try {
+                    await db.insert(brokerageDetails).values(allDetailsToInsert);
+                    console.log(`Successfully batch inserted ${allDetailsToInsert.length} brokerage details`);
+                } catch (insertError) {
+                    console.error(`Error batch inserting brokerage details: ${insertError}`);
+                }
+            }
+        } catch (err) {
+            console.error(`Error in batch saving process: ${err}`);
+        }
+    }
+
+    return insertedBrokerages;
+}
+
+function safeDate(value: Date | number | string | undefined | null, debugContext: string = ""): Date {
     // For null or undefined, return current date
     if (value === undefined || value === null) {
         console.error(`${debugContext}: Null or undefined date value, using current date`);

@@ -1,108 +1,89 @@
-import type { StockSymbolsResponse, StockUploadResponse } from "@/types/stocks";
+import type { StockSymbolsResponse, StockUploadResponse, ValidationError } from "@/types/stocks";
 
-import { ApiGet } from "./api-helper";
+import { ApiGet, ApiPostFormData } from "./api-helper";
 
-/**
- * Upload NSE stocks CSV file
- * @param file CSV file containing NSE stocks data
- * @returns Upload statistics and success message
- */
-export async function uploadNseStocks(file: File): Promise<StockUploadResponse> {
+// Type definition for stock stats response from server
+type StockStats = {
+    totalRecords: number;
+    inserted: number;
+    invalidRecords?: { reason: string; record: any }[];
+};
+
+// Interface for stock upload API responses
+type StockUploadApiResponse = {
+    success?: boolean;
+    message: string;
+    error?: string;
+    validationErrors?: ValidationError[];
+    nse?: StockStats;
+    bse?: StockStats;
+};
+
+export async function uploadBothStocks(nseFile: File, bseFile: File): Promise<StockUploadResponse> {
     try {
-        // //console.log(`Uploading NSE file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
-
-        // Read the first few lines of the file to check its content
-        await file.slice(0, 500).text();
-        // //console.log(`NSE file preview (first 500 chars):\n${filePreview}`);
+        // Verify both files are provided
+        if (!nseFile || !bseFile) {
+            throw new Error("Both NSE and BSE files are required");
+        }
 
         const formData = new FormData();
-        formData.append("nse", file);
 
-        const response = await fetch("/api/stocks/upload-nse-stocks", {
-            method: "POST",
-            body: formData,
-        });
+        // Append both files
+        formData.append("nse", nseFile);
+        formData.append("bse", bseFile);
 
-        const data = await response.json();
+        // Use ApiPostFormData utility from api-helper.ts with proper response typing
+        const data = await ApiPostFormData<StockUploadApiResponse>("/stocks/upload-stocks", formData);
 
-        if (!response.ok) {
-            throw new Error(data.error || "Failed to upload NSE stocks");
+        // If server returns success: false but doesn't throw an error
+        if (data.success === false) {
+            return {
+                success: false,
+                message: data.message || "File validation failed",
+                error: data.error,
+                validationErrors: data.validationErrors,
+            };
         }
 
         return {
             success: true,
-            message: data.message || "NSE stocks uploaded successfully",
+            message: data.message || "Stock files uploaded successfully",
             nse: data.nse,
-        };
-    } catch (error: any) {
-        // console.error("NSE stock upload error:", error);
-        // Provide more specific error message based on common problems
-        let errorMessage = "Failed to upload NSE stocks";
-
-        if (error.message.includes("required column")) {
-            errorMessage = `CSV format error: ${error.message}`;
-        } else if (error.message.includes("network") || error.message.includes("fetch")) {
-            errorMessage = "Network error: Could not connect to server";
-        }
-
-        return {
-            success: false,
-            message: "Failed to upload NSE stocks",
-            error: errorMessage,
-        };
-    }
-}
-
-export async function uploadBseStocks(file: File): Promise<StockUploadResponse> {
-    try {
-        // //console.log(`Uploading BSE file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
-
-        const formData = new FormData();
-        formData.append("bse", file);
-
-        // //console.log("FormData created with BSE file");
-
-        const response = await fetch("/api/stocks/upload-bse-stocks", {
-            method: "POST",
-            body: formData,
-        });
-
-        // //console.log(`BSE upload response status: ${response.status}`);
-        const data = await response.json();
-        // //console.log("BSE upload response data:", data);
-
-        if (!response.ok) {
-            throw new Error(data.error || "Failed to upload BSE stocks");
-        }
-
-        return {
-            success: true,
-            message: data.message || "BSE stocks uploaded successfully",
             bse: data.bse,
         };
     } catch (error: any) {
-        console.error("BSE stock upload error:", error);
-        // Provide more specific error message based on common problems
-        let errorMessage = "Failed to upload BSE stocks";
+        console.error("Stock files upload error:", error);
 
-        if (error.message.includes("required column")) {
+        // Check if there are structured validation errors in the response
+        const responseData = error.data;
+
+        // Handle structured validation errors
+        if (responseData?.validationErrors?.length > 0) {
+            return {
+                success: false,
+                message: "File validation failed",
+                error: error.message || "Failed to upload stock files",
+                validationErrors: responseData.validationErrors,
+            };
+        }
+
+        // Provide more specific error message based on common problems
+        let errorMessage = error.message || "Failed to upload stock files";
+
+        if (error.message?.includes("required column")) {
             errorMessage = `CSV format error: ${error.message}`;
-        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+        } else if (error.message?.includes("network") || error.message?.includes("fetch")) {
             errorMessage = "Network error: Could not connect to server";
         }
 
         return {
             success: false,
-            message: "Failed to upload BSE stocks",
+            message: "Failed to upload stock files",
             error: errorMessage,
         };
     }
 }
 
-/**
- * Get all stock symbols (NSE and BSE)
- * @returns Object containing NSE and BSE stock symbols
- */
 export async function getAllStockSymbols(): Promise<StockSymbolsResponse> {
     try {
         const response = await ApiGet<StockSymbolsResponse>("/stocks/symbols");

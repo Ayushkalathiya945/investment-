@@ -134,10 +134,28 @@ clientRouter.post("/create", zValidator("json", clientSchema), async (c) => {
 
 // Get all clients with pagination and search
 clientRouter.post("/get-all", zValidator("json", clientFilterSchema), async (c) => {
-    const { page, limit, search } = c.req.valid("json");
+    const { page, limit, search, from, to } = c.req.valid("json");
 
     try {
-        const { clients, count } = await clientQueries.findAllWithPagination({ page, limit, search });
+        // Parse dates if provided
+        let fromDate: Date | undefined;
+        let toDate: Date | undefined;
+
+        if (from) {
+            fromDate = new Date(from);
+        }
+
+        if (to) {
+            toDate = new Date(to);
+        }
+
+        const { clients, count } = await clientQueries.findAllWithPagination({
+            page,
+            limit,
+            search,
+            from: fromDate,
+            to: toDate,
+        });
 
         const totalPage = Math.ceil(count / limit);
 
@@ -147,6 +165,8 @@ clientRouter.post("/get-all", zValidator("json", clientFilterSchema), async (c) 
             metadata: {
                 total: count,
                 hasNext: page < totalPage,
+                totalPages: totalPage,
+                currentPage: page,
             },
         });
     } catch (error) {
@@ -269,6 +289,8 @@ clientRouter.delete("/:id", zValidator("param", clientGetOneSchema), async (c) =
             message: "Client deleted successfully",
         });
     } catch (error) {
+        console.error("Error deleting client:", error);
+
         if (error instanceof HTTPException)
             throw error;
         throw new HTTPException(500, { message: "Failed to delete client" });

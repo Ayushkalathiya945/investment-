@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -204,7 +205,10 @@ const AddPayment: React.FC<AddPaymentProps> = ({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="ml-auto bg-primary px-8 rounded-xl">{name}</Button>
+                <Button className="ml-auto bg-primary px-5 md:px-8 rounded-xl">
+                    <Plus size={18} />
+                    <span className="hidden md:flex">{name}</span>
+                </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-sm min-w-[150px] p-6">
 
@@ -214,7 +218,7 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="max-h-[calc(100vh-220px)] overflow-y-scroll">
+                <div className="max-h-[calc(100vh-220px)]">
                     <Form {...addPaymentForm}>
                         <form className="flex flex-col gap-4 w-full">
 
@@ -233,7 +237,7 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                                                         </div>
                                                     )
                                                 : (
-                                            // Otherwise show the dropdown
+                                                    // Otherwise show the dropdown
                                                         <Select
                                                             disabled={isLoadingClients}
                                                             value={field.value}

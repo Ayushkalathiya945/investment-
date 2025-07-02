@@ -10,6 +10,8 @@ import type {
     ClientUpdateRequest,
 } from "@/types/client";
 
+import { PAGE_LIMIT } from "@/lib/constants";
+
 import { ApiDelete, ApiGet, ApiPost, ApiPut } from "./api-helper";
 
 // create client
@@ -86,6 +88,8 @@ export async function updateClient(data: ClientUpdateRequest): Promise<Client> {
 
 // delete client
 export async function deleteClient(id: number): Promise<{ success: boolean; message: string }> {
+    console.log(`Deleting client with ID: ${id}`);
+
     const response = await ApiDelete<{ success: boolean; message: string }>(`/clients/${id}`);
 
     if (!response || !response.success) {
@@ -122,10 +126,10 @@ export async function getClientAnalytics(data: ClientFilterRequest): Promise<Cli
         // Prepare request data - must include page and limit for validation to pass
         const requestData = {
             page: data.page || 1,
-            limit: data.limit || 10,
+            limit: data.limit || PAGE_LIMIT,
             search: data.search,
-            from: formatDate(data.startDate || data.from),
-            to: formatDate(data.endDate || data.to),
+            from: formatDate(data.from),
+            to: formatDate(data.to),
         };
 
         const response = await ApiPost<ClientAnalyticsResponse>("/clients/analytics", requestData);

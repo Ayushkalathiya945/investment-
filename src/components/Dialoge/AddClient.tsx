@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Plus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -181,7 +182,7 @@ const AddClient: React.FC<AddClientProps> = ({
                     email: formData.email,
                     mobile: formData.mobileNo,
                     pan: formData.panNo,
-                    address: formData.address,
+                    address: formData.address && formData.address.trim() !== "" ? formData.address : undefined,
                 };
 
                 // Execute the update mutation
@@ -193,7 +194,7 @@ const AddClient: React.FC<AddClientProps> = ({
                     email: formData.email || "",
                     mobile: formData.mobileNo || "",
                     pan: formData.panNo || "",
-                    address: formData.address || "",
+                    address: formData.address && formData.address.trim() !== "" ? formData.address : undefined,
                 };
 
                 // Execute the create mutation
@@ -244,8 +245,8 @@ const AddClient: React.FC<AddClientProps> = ({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button className="ml-auto bg-primary px-5 md:px-8 rounded-xl">
-                    {!data?.id && "+"}
+                <Button className="ml-auto bg-primary px-5 md:px-10 rounded-xl">
+                    {name === "Edit" ? <Pencil size={14} /> : <Plus size={18} />}
                     <span className="hidden md:flex">{name}</span>
                 </Button>
             </DialogTrigger>

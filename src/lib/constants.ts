@@ -1,4 +1,4 @@
-export const PAGE_LIMIT = 10;
+export const PAGE_LIMIT = 15;
 
 export const ADMIN = "/admin";
 export const CLIENT = "/admin/client";

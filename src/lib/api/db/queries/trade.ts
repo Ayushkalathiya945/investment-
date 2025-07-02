@@ -93,6 +93,7 @@ export async function findBuyTradesWithRemainingQuantity(data: {
     clientId: number;
     symbol: string;
     exchange: string;
+    tradeDate: number;
 }, tx?: TransactionType) {
     return getDB(tx).query.trades.findMany({
         where: and(
@@ -101,7 +102,44 @@ export async function findBuyTradesWithRemainingQuantity(data: {
             eq(trades.exchange, data.exchange),
             eq(trades.type, TradeType.BUY),
             eq(trades.isFullySold, 0),
+            lte(trades.tradeDate, data.tradeDate),
         ),
         orderBy: [trades.tradeDate],
+    });
+}
+
+/**
+ * Get all active BUY trades for a client (with remaining quantity)
+ * @param clientId Client ID to get trades for
+ * @returns Array of trade records with remaining quantity
+ */
+export async function getActiveBuyTrades(clientId: number, tx?: TransactionType) {
+    return getDB(tx).query.trades.findMany({
+        where: and(
+            eq(trades.clientId, clientId),
+            eq(trades.type, TradeType.BUY),
+            eq(trades.isFullySold, 0), // Not fully sold
+        ),
+    });
+}
+
+export async function getTradesByDateRange(
+    clientId: number,
+    startDate: number,
+    endDate: number,
+    tx?: TransactionType,
+) {
+    return getDB(tx).query.trades.findMany({
+        where: and(
+            eq(trades.clientId, clientId),
+            gte(trades.tradeDate, startDate),
+            lte(trades.tradeDate, endDate),
+        ),
+    });
+}
+
+export async function getTradeById(tradeId: number, tx?: TransactionType) {
+    return getDB(tx).query.trades.findFirst({
+        where: eq(trades.id, tradeId),
     });
 }
