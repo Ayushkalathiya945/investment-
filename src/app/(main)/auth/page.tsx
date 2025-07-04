@@ -120,15 +120,15 @@ const Auth: React.FC = () => {
                 </div>
                 <div className="relative w-full h-full">
                     <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 z-10">
-                        <Image src="/auth_girl.png" alt="auth" width={200} height={200} className="w-90 h-100" />
+                        <Image src="/auth_girl.webp" alt="auth" width={200} height={200} className="w-90 h-100" />
                     </div>
 
                     <div className="absolute left-0 top-0 w-fit h-fit ">
-                        <Image src="/auth_finance_planning.png" alt="auth" width={200} height={200} className="w-75 h-80" />
+                        <Image src="/auth_finance_planning.webp" alt="auth" width={200} height={200} className="w-75 h-80" />
                     </div>
 
                     <div className="absolute right-0 bottom-0 w-fit">
-                        <Image src="/auth_chart.png" alt="auth" width={200} height={200} className="w-70 h-53" />
+                        <Image src="/auth_chart.webp" alt="auth" width={200} height={200} className="w-70 h-53" />
                     </div>
                 </div>
             </div>
