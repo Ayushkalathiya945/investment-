@@ -563,13 +563,13 @@ const Brokerage: React.FC = () => {
                             {isLoading
                                 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8">Loading brokerage data...</TableCell>
+                                            <TableCell colSpan={4} className="text-center py-8">Loading Fees data...</TableCell>
                                         </TableRow>
                                     )
                                 : paginatedData.length === 0
                                     ? (
                                             <TableRow>
-                                                <TableCell colSpan={4} className="text-center py-8">No brokerage records found</TableCell>
+                                                <TableCell colSpan={4} className="text-center py-8">No Fees records found</TableCell>
                                             </TableRow>
                                         )
                                     : paginatedData.map((item: BrokerageItem, index: number) => {
