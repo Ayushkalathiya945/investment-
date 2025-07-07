@@ -29,7 +29,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const navigation = [
         { name: "Client", href: CLIENT, icon: Users },
         { name: "Trade", href: TRADE, icon: ChartNoAxesCombined },
-        { name: "Brokerage", href: BROKERAGE, icon: ChartLine },
+        { name: "Fees", href: BROKERAGE, icon: ChartLine },
         { name: "Payment History", href: PAYMENT_HISTORY, icon: CreditCard },
         { name: "Stocks", href: STOCKS, icon: TrendingUp },
     ];

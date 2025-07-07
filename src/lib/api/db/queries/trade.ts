@@ -104,6 +104,34 @@ export async function calculateTotalTradeAmount(data: { clientId?: number; from?
     return totalTradeAmount && totalTradeAmount.length > 0 ? totalTradeAmount[0].totalAmount : 0;
 }
 
+export async function calculateTotalSoldAmount(data: { clientId?: number; from?: number; to?: number }, tx?: TransactionType) {
+    const conditions = [];
+
+    // Add condition for client ID if provided
+    if (data.clientId)
+        conditions.push(eq(trades.clientId, data.clientId));
+
+    // Add condition for trade type = SELL
+    conditions.push(eq(trades.type, TradeType.SELL));
+
+    // Add date range conditions if provided
+    if (data.from)
+        conditions.push(gte(trades.tradeDate, data.from));
+    if (data.to)
+        conditions.push(lte(trades.tradeDate, data.to));
+
+    if (conditions.length === 0)
+        return 0;
+
+    // Calculate the total net amount of all SELL trades
+    const totalSoldAmount = await getDB(tx)
+        .select({ totalAmount: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)` })
+        .from(trades)
+        .where(and(...conditions));
+
+    return totalSoldAmount && totalSoldAmount.length > 0 ? totalSoldAmount[0].totalAmount : 0;
+}
+
 export async function findBuyTradesWithRemainingQuantity(data: {
     clientId: number;
     symbol: string;

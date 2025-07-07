@@ -392,7 +392,7 @@ const Brokerage: React.FC = () => {
     return (
         <div className="flex flex-col w-full min-h-[94vh] gap-5">
             <div className="flex-col md:flex md:flex-row justify-between w-full">
-                <h1 className="text-3xl font-semibold">Brokerage</h1>
+                <h1 className="text-3xl font-semibold">Fees</h1>
                 <div className="flex-col md:flex md:flex-row gap-4 items-center">
                     <div className="flex min-w-50">
                         <Select
@@ -543,7 +543,7 @@ const Brokerage: React.FC = () => {
                         currency: "INR",
                         maximumFractionDigits: 0,
                     }).format(totalBrokerageAmount)}
-                    label="Total Brokerage"
+                    label="Total Fees"
                 />
             </div>
 
@@ -554,7 +554,7 @@ const Brokerage: React.FC = () => {
                             <TableRow className="bg-[#F9F9F9] text-[16px] font-semibold  w-full justify-between items-center gap-4 rounded-lg py-3">
                                 <TableHead className="rounded-tl-xl">No.</TableHead>
                                 <TableHead>Client</TableHead>
-                                <TableHead>Total Brokerage</TableHead>
+                                <TableHead>Total Fees</TableHead>
                                 <TableHead className="rounded-tr-xl">{periodType === PeriodType.QUARTER ? "Quarter" : (periodType === PeriodType.MONTH ? "Month" : "Period")}</TableHead>
                             </TableRow>
                         </TableHeader>

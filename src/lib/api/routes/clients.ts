@@ -186,16 +186,20 @@ clientRouter.get("/get-one/:id", zValidator("param", clientGetOneSchema), async 
             throw new HTTPException(404, { message: "Client not found" });
         }
 
-        // help me to calculate the total trade amount of particular client
+        // Calculate the total trade amount of particular client
         const totalTradeAmount = await tradeQueries.calculateTotalTradeAmount({ clientId: id });
 
-        // console.log("Total Tread Amount : ", totalTradeAmount);
-
-        // help me to calculate the total brokerage amount of particular client
+        // Calculate the total brokerage amount of particular client
         const totalBrokerageAmount = await brokerageQueries.calculateTotalbrokerageAmount({ clientId: id });
 
-        // help me to calculate the total payment amount of particular client
+        // Calculate the total payment amount of particular client
         const totalPaymentAmount = await paymentQueries.calculateTotalPaymentAmount({ clientId: id });
+
+        // Calculate the total sold stock amount for this client
+        const totalSoldAmount = await tradeQueries.calculateTotalSoldAmount({ clientId: id });
+
+        // Calculate remaining purse amount (initial purse - buy trades + sell trades)
+        const remainingPurseAmount = client.purseAmount - totalTradeAmount + totalSoldAmount;
 
         return c.json({
             success: true,
@@ -204,7 +208,8 @@ clientRouter.get("/get-one/:id", zValidator("param", clientGetOneSchema), async 
                 totalTradeAmount,
                 totalBrokerageAmount,
                 totalPaymentAmount,
-
+                totalSoldAmount,
+                remainingPurseAmount,
             },
         });
     } catch (error) {
@@ -322,9 +327,12 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
         });
 
         // Calculate remaining purse amount (considering only trades, not payments or brokerage)
-        const totalBuyValue = financialTotals.totalBuyTrades || 0; // Total cost
-        const totalSellValue = financialTotals.totalSellTrades || 0; // Total revenue
+        // When a date range is selected, we're calculating the purse amount as of the end date
+        const totalBuyValue = financialTotals.totalBuyTrades || 0; // Total cost of ALL buy trades up to end date
+        const totalSellValue = financialTotals.totalSellTrades || 0; // Total revenue from ALL sell trades up to end date
         const totalInitialPurse = financialTotals.totalPurseAmount || 0; // Total initial purse amount
+
+        // Formula: Initial Purse - All Buy Trades + All Sell Trades (up to end date)
         const remainingPurseAmount = totalInitialPurse - totalBuyValue + totalSellValue;
 
         const response = {

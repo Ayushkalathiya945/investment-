@@ -142,7 +142,7 @@ const ClientDetail: React.FC = () => {
                     </div>
                 </div>
             </div>
-            <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 justify-between gap-3 px-2">
+            <div className="grid lg:grid-cols-5 md:grid-cols-2 grid-cols-1 justify-between gap-3 px-2">
                 <StatCard
                     icon={<IndianRupee />}
                     value={typeof client.totalTradeAmount === "number" ? `₹${client.totalTradeAmount.toLocaleString("en-IN")}` : "₹0"}
@@ -151,12 +151,27 @@ const ClientDetail: React.FC = () => {
                 <StatCard
                     icon={<Wallet />}
                     value={typeof client.purseAmount === "number" ? `₹${client.purseAmount.toLocaleString("en-IN")}` : "₹0"}
-                    label="Purse Amount"
+                    label="Initial Purse Amount"
                 />
+                {/* Show remaining purse amount from API */}
+                <StatCard
+                    icon={<Wallet />}
+                    value={typeof client.remainingPurseAmount === "number"
+                        ? `₹${client.remainingPurseAmount.toLocaleString("en-IN")}`
+                        : "₹0"}
+                    label="Remaining Purse Amount"
+                />
+                {/* Display total sold stock amount */}
+                {/* <StatCard
+                    icon={<TrendingUp />}
+                    value={typeof client.totalSoldAmount === "number" ?
+                        `₹${client.totalSoldAmount.toLocaleString("en-IN")}` : "₹0"}
+                    label="Sold Stock Amount"
+                /> */}
                 <StatCard
                     icon={<TrendingUp />}
                     value={typeof client.totalBrokerageAmount === "number" ? `₹${client.totalBrokerageAmount.toLocaleString("en-IN")}` : "₹0"}
-                    label="Total Brokerage"
+                    label="Total Fees"
                 />
                 <StatCard
                     icon={<CreditCard />}
@@ -222,7 +237,7 @@ const ClientDetail: React.FC = () => {
                         </div>
                     </Link>
                     <Link href={`/admin/brokerage?clientId=${client.id}`} className="flex gap-2 items-center hover:bg-secondary rounded-full px-2 py-1 cursor-pointer">
-                        <span className="text-sm">Brokerage</span>
+                        <span className="text-sm">Fees</span>
                         <div className="bg-primary text-white h-fit p-2 rounded-full">
                             <ArrowUpRight size={15} />
                         </div>

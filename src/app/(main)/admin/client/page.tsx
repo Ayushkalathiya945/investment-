@@ -187,7 +187,6 @@ const Client: React.FC = () => {
         totalTradeAmount: analyticsResponse?.data.totalValue || 0,
         totalBrokerageAmount: analyticsResponse?.data.totalBrokerage || 0,
         totalPaymentAmount: analyticsResponse?.data.totalPayment || 0,
-        // Use remaining purse amount from API (Initial Purse - BUY trades + SELL trades)
         remainingPurseAmount: analyticsResponse?.data.remainingPurseAmount || 0,
     };
 
@@ -206,7 +205,7 @@ const Client: React.FC = () => {
                     <AddClient name="Add Client" />
                 </div>
             </div>
-            <div className="grid lg:grid-cols-5 md:grid-cols-3 grid-cols-1 justify-between gap-3 px-2">
+            <div className="grid 2xl:grid-cols-4 xl:grid-cols-4 lg:grid-cols-2 md:grid-cols-2 grid-cols-1 gap-3 px-2">
                 <StatCard icon={<Users />} value={analytics.totalClient} label="Total Clients" />
                 <StatCard
                     icon={<IndianRupee />}
@@ -216,17 +215,12 @@ const Client: React.FC = () => {
                 <StatCard
                     icon={<TrendingUp />}
                     value={typeof analytics.totalBrokerageAmount === "number" ? `₹${analytics.totalBrokerageAmount.toLocaleString("en-IN")}` : "₹0"}
-                    label="Total Brokerage"
+                    label="Total fees"
                 />
                 <StatCard
                     icon={<TrendingDown />}
                     value={typeof analytics.totalPaymentAmount === "number" ? `₹${analytics.totalPaymentAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Payments Received"
-                />
-                <StatCard
-                    icon={<IndianRupee />}
-                    value={typeof analytics.remainingPurseAmount === "number" ? `₹${analytics.remainingPurseAmount.toLocaleString("en-IN")}` : "₹0"}
-                    label="Remaining Purse Amount"
                 />
             </div>
             <div className="relative w-full">

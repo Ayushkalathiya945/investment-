@@ -43,6 +43,8 @@ export type Client = {
     totalTradeAmount?: number;
     totalBrokerageAmount?: number;
     totalPaymentAmount?: number;
+    totalSoldAmount?: number;
+    remainingPurseAmount?: number;
 };
 
 export type ClientCreateRequest = {

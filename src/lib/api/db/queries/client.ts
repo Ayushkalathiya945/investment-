@@ -176,7 +176,7 @@ export async function calculateFinancialTotalsByDateRange(
             .select({
                 totalValue: sql<number>`COALESCE(SUM(
       CASE 
-        WHEN ${trades.type} = 'BUY' AND ${trades.isFullySold} = false 
+        WHEN ${trades.type} = 'BUY' AND ${trades.isFullySold} = 0 
         THEN ${trades.remainingQuantity} * ${trades.price}
         ELSE 0
       END
@@ -224,7 +224,8 @@ export async function calculateFinancialTotalsByDateRange(
         if (to)
             paymentsQuery.where(lte(payments.paymentDate, endOfDayTo!));
 
-        // Get total BUY trades value within the selected date range
+        // Get total BUY trades value up to the end date (not limited by start date)
+        // For accurate purse amount calculation, we need ALL buy trades up to the end date
         const buyTradesQuery = db
             .select({
                 totalBuyTrades: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)`,
@@ -232,13 +233,13 @@ export async function calculateFinancialTotalsByDateRange(
             .from(trades)
             .where(eq(trades.type, TradeType.BUY));
 
-        // Only apply date filters if they are provided
-        if (from)
-            buyTradesQuery.where(gte(trades.tradeDate, from.getTime()));
+        // Only apply the end date filter
+        // We don't filter by from date because we need all BUY transactions up to the end date
         if (to)
             buyTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
 
-        // Get total SELL trades value within the selected date range
+        // Get total SELL trades value up to the end date (not limited by start date)
+        // For accurate purse amount calculation, we need ALL sell trades up to the end date
         const sellTradesQuery = db
             .select({
                 totalSellTrades: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)`,
@@ -246,13 +247,14 @@ export async function calculateFinancialTotalsByDateRange(
             .from(trades)
             .where(eq(trades.type, TradeType.SELL));
 
-        // Only apply date filters if they are provided
-        if (from)
-            sellTradesQuery.where(gte(trades.tradeDate, from.getTime()));
+        // Only apply the end date filter
+        // We don't filter by from date because we need all SELL transactions up to the end date
         if (to)
             sellTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
 
-        // Get total purse amount
+        // Get total purse amount (initial value from all clients)
+        // We don't filter the purse amount by date because it represents the initial amount
+        // The remaining amount will be calculated by adjusting this with buy/sell trades
         const purseAmountQuery = db
             .select({
                 totalPurseAmount: sql<number>`COALESCE(SUM(${clients.purseAmount}), 0)`,
