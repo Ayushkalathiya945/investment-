@@ -170,6 +170,8 @@ export async function calculateFinancialTotalsByDateRange(
         if (to)
             clientCountQuery.where(lte(clients.createdAt, endOfDayTo!));
 
+        // Calculate portfolio value based on current holdings (BUY trades that aren't fully sold)
+        // This represents the cost of current holdings (what was paid), not the current market value
         const portfolioValueQuery = db
             .select({
                 totalValue: sql<number>`COALESCE(SUM(
@@ -185,8 +187,8 @@ export async function calculateFinancialTotalsByDateRange(
                 and(eq(trades.type, TradeType.BUY), eq(trades.isFullySold, 0)),
             );
 
-        if (from)
-            portfolioValueQuery.where(gte(trades.createdAt, from));
+        // Only filter by the "to" date - we want all holdings up to the end date
+        // We don't filter by "from" date because we want ALL current holdings regardless of purchase date
         if (to)
             portfolioValueQuery.where(lte(trades.createdAt, endOfDayTo!));
 
@@ -222,12 +224,50 @@ export async function calculateFinancialTotalsByDateRange(
         if (to)
             paymentsQuery.where(lte(payments.paymentDate, endOfDayTo!));
 
-        const [clientCount, portfolioResult, brokerageResult, paymentsResult]
+        // Get total BUY trades value within the selected date range
+        const buyTradesQuery = db
+            .select({
+                totalBuyTrades: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)`,
+            })
+            .from(trades)
+            .where(eq(trades.type, TradeType.BUY));
+
+        // Only apply date filters if they are provided
+        if (from)
+            buyTradesQuery.where(gte(trades.tradeDate, from.getTime()));
+        if (to)
+            buyTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
+
+        // Get total SELL trades value within the selected date range
+        const sellTradesQuery = db
+            .select({
+                totalSellTrades: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)`,
+            })
+            .from(trades)
+            .where(eq(trades.type, TradeType.SELL));
+
+        // Only apply date filters if they are provided
+        if (from)
+            sellTradesQuery.where(gte(trades.tradeDate, from.getTime()));
+        if (to)
+            sellTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
+
+        // Get total purse amount
+        const purseAmountQuery = db
+            .select({
+                totalPurseAmount: sql<number>`COALESCE(SUM(${clients.purseAmount}), 0)`,
+            })
+            .from(clients);
+
+        const [clientCount, portfolioResult, brokerageResult, paymentsResult, buyTradesResult, sellTradesResult, purseAmountResult]
             = await Promise.all([
                 clientCountQuery.execute(),
                 portfolioValueQuery.execute(),
                 brokerageQuery.execute(),
                 paymentsQuery.execute(),
+                buyTradesQuery.execute(),
+                sellTradesQuery.execute(),
+                purseAmountQuery.execute(),
             ]);
 
         const result = {
@@ -235,6 +275,9 @@ export async function calculateFinancialTotalsByDateRange(
             totalPortfolioValue: Number(portfolioResult[0]?.totalValue || 0),
             totalBrokerage: Number(brokerageResult[0]?.totalBrokerage || 0),
             totalPayments: Number(paymentsResult[0]?.totalPayments || 0),
+            totalBuyTrades: Number(buyTradesResult[0]?.totalBuyTrades || 0),
+            totalSellTrades: Number(sellTradesResult[0]?.totalSellTrades || 0),
+            totalPurseAmount: Number(purseAmountResult[0]?.totalPurseAmount || 0),
         };
 
         // console.log("Financial totals calculated:", result);
@@ -247,6 +290,9 @@ export async function calculateFinancialTotalsByDateRange(
             totalPortfolioValue: 0,
             totalBrokerage: 0,
             totalPayments: 0,
+            totalBuyTrades: 0,
+            totalSellTrades: 0,
+            totalPurseAmount: 0,
         };
     }
 }

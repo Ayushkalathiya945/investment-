@@ -48,16 +48,22 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
             console.log("Error response:", JSON.stringify(response, null, 2));
             const error = new Error(errorMessage);
 
-            // If the API returns specific error details like insufficient stocks, add them to the error object
+            // If the API returns specific error details, add them to the error object
             if (response?.error) {
                 (error as any).error = response.error;
+            }
+
+            // Check if this is a brokerage conflict based on the message
+            if (errorMessage.includes("brokerage has already been calculated")
+                || errorMessage.includes("brokerage calculation first")) {
+                (error as any).isBrokerageConflict = true;
             }
 
             throw error;
         }
 
         return {
-            data: response.data,
+            data: response.data as Trade,
             message: response.message || "Trade created successfully",
         };
     } catch (error: any) {
@@ -80,8 +86,19 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
                 status: error.status,
             });
 
-            // The message should now be correctly set from our ApiPost function
-            // We don't need to modify it further
+            // Check for specific status codes
+            if (error.status === 409) {
+                // This is likely a brokerage calculation conflict
+                error.isBrokerageConflict = true;
+
+                // Make sure the error message is clear
+                if (error.message && error.message.includes("brokerage has already been calculated")) {
+                    // The message is already clear about brokerage calculation
+                } else {
+                    // Ensure there's a clear message about brokerage
+                    error.message = error.message || "Cannot create trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                }
+            }
 
             // But make sure to preserve any additional error details for validation errors
             if (error.data?.error) {
@@ -89,6 +106,11 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
             }
         } else if (error.response) { // Handle regular Axios error responses (should not happen with our updated ApiPost)
             console.log("Direct Axios error:", error.response);
+
+            // Check for specific status codes in Axios response
+            if (error.response.status === 409) {
+                error.isBrokerageConflict = true;
+            }
 
             // Handle API response with validation issues
             if (error.response.data?.error?.issues) {
@@ -147,15 +169,47 @@ export async function getAllTrades(data: TradeFilterRequest): Promise<TradesList
 }
 
 // Get a trade by ID
-export async function getTradeById(id: number): Promise<Trade> {
+export async function getTradeById(id: number): Promise<any> { // Changed return type to 'any' to accommodate nested structure
     try {
-        const response = await ApiGet<TradeResponse>(`/trades/${id}`);
+        console.log(`Fetching trade details for ID: ${id}`);
+        const response = await ApiGet<any>(`/trades/get-one/${id}`);
 
         if (!response || !response.success) {
             throw new Error(response?.message || "Failed to fetch trade");
         }
 
-        return response.data;
+        // Log the raw response to see the exact structure
+        console.log("Raw trade response:", response);
+
+        // The API might return the trade directly or nested inside a 'trade' property
+        const tradeResponse = response.data as any;
+
+        // Process the trade data, whether it's nested or not
+        if (tradeResponse) {
+            // If there's a nested trade property
+            if ("trade" in tradeResponse) {
+                const tradeData = tradeResponse.trade;
+                if (tradeData && tradeData.tradeDate && typeof tradeData.tradeDate === "number") {
+                    // Convert timestamp to YYYY-MM-DD format
+                    const dateObj = new Date(tradeData.tradeDate);
+                    const year = dateObj.getFullYear();
+                    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+                    const day = String(dateObj.getDate()).padStart(2, "0");
+                    tradeData.tradeDate = `${year}-${month}-${day}`;
+                }
+            } else if ("tradeDate" in tradeResponse && typeof tradeResponse.tradeDate === "number") { // If this is a direct trade object (not nested)
+                // Convert timestamp to YYYY-MM-DD format
+                const dateObj = new Date(tradeResponse.tradeDate);
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+                const day = String(dateObj.getDate()).padStart(2, "0");
+                tradeResponse.tradeDate = `${year}-${month}-${day}`;
+            }
+        }
+
+        console.log(`Trade details processed:`, tradeResponse);
+
+        return tradeResponse;
     } catch (error: any) {
         console.error(`Error fetching trade #${id}:`, error);
         throw error;
@@ -196,6 +250,20 @@ export async function deleteTrade(id: number): Promise<{ success: boolean; messa
                 status: error.status,
             });
 
+            // Check for specific status codes
+            if (error.status === 409) {
+                // This is likely a brokerage calculation conflict
+                error.isBrokerageConflict = true;
+
+                // Make sure the error message is clear
+                if (error.message && error.message.includes("brokerage has already been calculated")) {
+                    // The message is already clear about brokerage calculation
+                } else {
+                    // Ensure there's a clear message about brokerage
+                    error.message = error.message || "Cannot delete trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                }
+            }
+
             if (error.data?.error) {
                 error.error = error.data.error;
             }
@@ -217,9 +285,9 @@ export async function deleteTrade(id: number): Promise<{ success: boolean; messa
 }
 
 // Update an existing trade
-export async function updateTrade(id: number, data: UpdateTradeRequest): Promise<{ data: Trade; message: string }> {
+export async function updateTrade(id: number, data: UpdateTradeRequest): Promise<{ data: any; message: string }> {
     try {
-        const response = await ApiPut<TradeResponse>(`/trades/${id}`, data);
+        const response = await ApiPut<TradeResponse>(`/trades/update`, { ...data, id });
 
         if (!response || !response.success) {
             // Handle specific business logic errors that should be displayed in toast
@@ -235,8 +303,32 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
             throw error;
         }
 
+        // Process the response data to ensure proper format
+        const responseData = response.data as any;
+
+        // If there's a nested structure with trade data
+        if (responseData && "trade" in responseData) {
+            // Process date if needed for the nested trade object
+            const tradeData = responseData.trade;
+            if (tradeData && tradeData.tradeDate && typeof tradeData.tradeDate === "number") {
+                const dateObj = new Date(tradeData.tradeDate);
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+                const day = String(dateObj.getDate()).padStart(2, "0");
+                tradeData.tradeDate = `${year}-${month}-${day}`;
+            }
+        } else if (responseData && "tradeDate" in responseData && typeof responseData.tradeDate === "number") { // If it's a direct trade object
+            const dateObj = new Date(responseData.tradeDate);
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+            const day = String(dateObj.getDate()).padStart(2, "0");
+            responseData.tradeDate = `${year}-${month}-${day}`;
+        }
+
+        console.log("Processed update response:", responseData);
+
         return {
-            data: response.data,
+            data: responseData,
             message: response.message || "Trade updated successfully",
         };
     } catch (error: any) {
@@ -251,8 +343,19 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
                 status: error.status,
             });
 
-            // The message should now be correctly set from our ApiPut function
-            // We don't need to modify it further
+            // Check for specific status codes
+            if (error.status === 409) {
+                // This is likely a brokerage calculation conflict
+                error.isBrokerageConflict = true;
+
+                // Make sure the error message is clear
+                if (error.message && error.message.includes("brokerage has already been calculated")) {
+                    // The message is already clear about brokerage calculation
+                } else {
+                    // Ensure there's a clear message about brokerage
+                    error.message = error.message || "Cannot update trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                }
+            }
 
             // But make sure to preserve any additional error details for validation errors
             if (error.data?.error) {
@@ -260,6 +363,11 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
             }
         } else if (error.response) { // Handle regular Axios error responses (should not happen with our updated ApiPut)
             console.log("Direct Axios error in update:", error.response);
+
+            // Check for specific status codes in Axios response
+            if (error.response.status === 409) {
+                error.isBrokerageConflict = true;
+            }
 
             // Handle API response with validation issues
             if (error.response.data?.error?.issues) {

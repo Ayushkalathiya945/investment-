@@ -321,6 +321,12 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
             to: toDate,
         });
 
+        // Calculate remaining purse amount (considering only trades, not payments or brokerage)
+        const totalBuyValue = financialTotals.totalBuyTrades || 0; // Total cost 
+        const totalSellValue = financialTotals.totalSellTrades || 0; // Total revenue 
+        const totalInitialPurse = financialTotals.totalPurseAmount || 0; // Total initial purse amount 
+        const remainingPurseAmount = totalInitialPurse - totalBuyValue + totalSellValue;
+
         const response = {
             success: true,
             data: {
@@ -328,6 +334,7 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
                 totalValue: financialTotals.totalPortfolioValue,
                 totalPayment: financialTotals.totalPayments,
                 totalBrokerage: financialTotals.totalBrokerage,
+                remainingPurseAmount,
             },
             _debug: {
                 request: body,

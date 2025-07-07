@@ -13,6 +13,7 @@ export const addClientSchema = z.object({
             message: "Address must be at least 5 characters long if provided",
         })
         .optional(),
+    purseAmount: z.number().nonnegative().optional(),
 });
 
 export type AddClientField = z.infer<typeof addClientSchema>;
@@ -24,6 +25,7 @@ export type AddClient = {
     mobileNo?: string;
     email?: string;
     address?: string;
+    purseAmount?: number;
 };
 
 // Types for client API responses
@@ -34,6 +36,7 @@ export type Client = {
     mobile: string;
     pan: string;
     address: string;
+    purseAmount: number;
     createdAt?: string;
     updatedAt?: string;
     // Client detail additional fields
@@ -48,6 +51,7 @@ export type ClientCreateRequest = {
     mobile: string;
     pan: string;
     address?: string;
+    purseAmount?: number;
 };
 
 export type ClientResponse = {
@@ -80,6 +84,7 @@ export type ClientUpdateRequest = {
     mobile?: string;
     pan?: string;
     address?: string;
+    purseAmount?: number;
 };
 
 export type ClientAnalyticsResponse = {
@@ -90,6 +95,7 @@ export type ClientAnalyticsResponse = {
         totalValue: number;
         totalPayment: number;
         totalBrokerage: number;
+        remainingPurseAmount: number;
     };
     _debug?: {
         timestamp: string;

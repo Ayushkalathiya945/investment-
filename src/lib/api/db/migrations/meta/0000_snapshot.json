@@ -1,7 +1,7 @@
 {
     "version": "6",
     "dialect": "sqlite",
-    "id": "6411dc28-88e7-4f58-b60e-e637933e701a",
+    "id": "391bac04-dd8f-40cd-a721-78ae5f1ac845",
     "prevId": "00000000-0000-0000-0000-000000000000",
     "tables": {
         "admins": {
@@ -472,6 +472,14 @@
                     "primaryKey": false,
                     "notNull": false,
                     "autoincrement": false
+                },
+                "purse_amount": {
+                    "name": "purse_amount",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
                 },
                 "created_at": {
                     "name": "created_at",

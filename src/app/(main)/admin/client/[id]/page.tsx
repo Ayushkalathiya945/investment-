@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, ChevronLeft, CreditCard, IndianRupee, Loader2, Mail, MapPin, Phone, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, CreditCard, IndianRupee, Loader2, Mail, MapPin, Phone, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState } from "react";
@@ -66,6 +66,7 @@ const ClientDetail: React.FC = () => {
                 mobileNo: client.mobile,
                 email: client.email,
                 address: client.address,
+                purseAmount: client.purseAmount,
             });
         }
     };
@@ -148,18 +149,14 @@ const ClientDetail: React.FC = () => {
                     label="Total Portfolio Value"
                 />
                 <StatCard
+                    icon={<Wallet />}
+                    value={typeof client.purseAmount === "number" ? `₹${client.purseAmount.toLocaleString("en-IN")}` : "₹0"}
+                    label="Purse Amount"
+                />
+                <StatCard
                     icon={<TrendingUp />}
                     value={typeof client.totalBrokerageAmount === "number" ? `₹${client.totalBrokerageAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Total Brokerage"
-                />
-                <StatCard
-                    icon={<TrendingDown />}
-                    value={
-                        (typeof client.totalBrokerageAmount === "number" && typeof client.totalPaymentAmount === "number")
-                            ? `₹${Math.max(0, client.totalBrokerageAmount - client.totalPaymentAmount).toLocaleString("en-IN")}`
-                            : "₹0"
-                    }
-                    label="Brokerage Remaining"
                 />
                 <StatCard
                     icon={<CreditCard />}
@@ -230,6 +227,12 @@ const ClientDetail: React.FC = () => {
                             <ArrowUpRight size={15} />
                         </div>
                     </Link>
+                    <Link href={`/admin/payment-history?clientId=${client.id}`} className="flex gap-2 items-center hover:bg-secondary rounded-full px-2 py-1 cursor-pointer">
+                        <span className="text-sm">Payment</span>
+                        <div className="bg-primary text-white h-fit p-2 rounded-full">
+                            <ArrowUpRight size={15} />
+                        </div>
+                    </Link>
                     <div className="flex gap-2 items-center">
                         <AddPayment
                             name="Add Payment"
@@ -237,12 +240,7 @@ const ClientDetail: React.FC = () => {
                             onSuccess={handlePaymentSuccess}
                         />
                     </div>
-                    <Link href={`/admin/payment-history?clientId=${client.id}`} className="flex gap-2 items-center hover:bg-secondary rounded-full px-2 py-1 cursor-pointer">
-                        <span className="text-sm">Payment</span>
-                        <div className="bg-primary text-white h-fit p-2 rounded-full">
-                            <ArrowUpRight size={15} />
-                        </div>
-                    </Link>
+
                 </div>
             </div>
 

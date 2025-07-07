@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 
@@ -16,6 +17,7 @@ import * as fifoQueries from "../db/queries/fifoAllocation";
 import * as stockQueries from "../db/queries/stock";
 import * as tradeQueries from "../db/queries/trade";
 import {
+    brokerageDetails,
     TradeType,
 } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
@@ -255,29 +257,40 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
     } catch (error: any) {
         console.error("Trade creation error:", error);
 
-        // If it's already an HTTPException, just pass it through
-        if (error instanceof HTTPException) {
-            throw error;
-        }
+        // Get specific error message
+        let errorMessage = "Failed to create trade. Please check your data and try again.";
+        let _errorStatus = 500;
 
-        // If the error has a message property, use it for better error messaging
-        if (error && typeof error === "object" && error.message) {
+        // If it's an HTTPException, extract the message and status
+        if (error instanceof HTTPException) {
+            errorMessage = error.message || errorMessage;
+            _errorStatus = error.status;
+        } else if (error && typeof error === "object" && error.message) { // Handle non-HTTPException errors with message property
+            errorMessage = error.message;
+
             // Extract specific error messages we want to show directly to users
             if (error.message.includes("Insufficient shares")) {
-                throw new HTTPException(400, { message: error.message });
-            }
-
-            if (error.message.includes("Stock not found")) {
-                throw new HTTPException(404, { message: error.message });
-            }
-
-            if (error.message.includes("Client not found")) {
-                throw new HTTPException(404, { message: error.message });
+                errorMessage = error.message;
+                _errorStatus = 400;
+            } else if (error.message.includes("Stock not found")) {
+                errorMessage = error.message;
+                _errorStatus = 404;
+            } else if (error.message.includes("Client not found")) {
+                errorMessage = error.message;
+                _errorStatus = 404;
+            } else if (error.message.includes("brokerage has already been calculated")
+                || error.message.includes("brokerage calculation first")) {
+                errorMessage = "Cannot create trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                _errorStatus = 409;
             }
         }
 
-        // If we couldn't identify a specific error message, use a generic one
-        throw new HTTPException(500, { message: "Failed to create trade. Please check your data and try again." });
+        // Return a consistent error response format
+        return c.json({
+            success: false,
+            message: errorMessage,
+            error: errorMessage,
+        });
     }
 });
 
@@ -288,6 +301,27 @@ async function reverseTrade(
     trade: Trade,
     tx?: TransactionType,
 ): Promise<void> {
+    // Check if brokerage has already been calculated for this trade
+    if (trade.lastBrokerageCalculated) {
+        const year = Math.floor(trade.lastBrokerageCalculated / 100);
+        const month = trade.lastBrokerageCalculated % 100;
+        throw new HTTPException(409, {
+            message: `Cannot modify this trade as brokerage has already been calculated for ${month}/${year}. Please delete the brokerage calculation first.`,
+        });
+    }
+
+    // Double check for any brokerage calculations linked to this trade
+    const dbCheck = getDB(tx);
+    const brokerageDetailsForTrade = await dbCheck.query.brokerageDetails.findMany({
+        where: eq(brokerageDetails.tradeId, trade.id),
+    });
+
+    if (brokerageDetailsForTrade && brokerageDetailsForTrade.length > 0) {
+        throw new HTTPException(409, {
+            message: `Cannot modify this trade as it has associated brokerage calculations. `,
+        });
+    }
+
     if (trade.type === TradeType.BUY) {
         // For a BUY trade, we need to check if any of the shares have been sold
         const allocations = await fifoQueries.findByBuyTradeId(trade.id, tx);
@@ -309,6 +343,15 @@ async function reverseTrade(
             const buyTrade = await tradeQueries.findOne({ id: allocation.buyTradeId }, tx);
             if (!buyTrade) {
                 throw new HTTPException(404, { message: `Buy trade not found for allocation ${allocation.id}` });
+            }
+
+            // Check if the buy trade has brokerage calculated
+            if (buyTrade.lastBrokerageCalculated) {
+                const year = Math.floor(buyTrade.lastBrokerageCalculated / 100);
+                const month = buyTrade.lastBrokerageCalculated % 100;
+                throw new HTTPException(409, {
+                    message: `Cannot modify this sell trade as brokerage has already been calculated for the associated buy trade from ${month}/${year}. Please delete the brokerage calculation first.`,
+                });
             }
 
             // Restore shares to the buy trade
@@ -339,6 +382,7 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
         price?: number;
         tradeDate?: string;
         notes?: string;
+        exchange?: ExchangeType;
     };
 
     try {
@@ -346,6 +390,29 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
         const existingTrade = await tradeQueries.findOne({ id: updateData.id });
         if (!existingTrade) {
             throw new HTTPException(404, { message: "Trade not found" });
+        }
+
+        // Check if brokerage has already been calculated for this trade
+        if (existingTrade.lastBrokerageCalculated) {
+            const year = Math.floor(existingTrade.lastBrokerageCalculated / 100);
+            const month = existingTrade.lastBrokerageCalculated % 100;
+
+            // Throw an error and prevent update - stricter enforcement
+            throw new HTTPException(409, {
+                message: `Cannot modify this trade as brokerage has already been calculated for ${month}/${year}. Please delete the brokerage calculation first before modifying this trade.`,
+            });
+        }
+
+        // Double check directly with brokerageDetails table to ensure no brokerage exists for this trade
+        const dbCheck = getDB();
+        const brokerageDetailsForTrade = await dbCheck.query.brokerageDetails.findMany({
+            where: eq(brokerageDetails.tradeId, existingTrade.id),
+        });
+
+        if (brokerageDetailsForTrade && brokerageDetailsForTrade.length > 0) {
+            throw new HTTPException(409, {
+                message: `Cannot modify this trade as it has associated brokerage calculations. `,
+            });
         }
 
         // Validate client exists if clientId is being updated
@@ -360,10 +427,13 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
 
         // Get stock information (either existing or new)
         const symbolToCheck = updateData.symbol || existingTrade.symbol;
-        const stock = await stockQueries.findOne({ symbol: symbolToCheck, exchange: existingTrade.exchange });
+        const exchangeToCheck = updateData.exchange || existingTrade.exchange;
+        const stock = await stockQueries.findOne({ symbol: symbolToCheck, exchange: exchangeToCheck });
         if (!stock) {
             throw new HTTPException(404, { message: "Stock not found" });
-        } // Use a transaction for all database operations to ensure consistency
+        }
+
+        // Use a transaction for all database operations to ensure consistency
         const db = getDB();
         return await db.transaction(async (tx: TransactionType) => {
             // Reverse the effects of the original trade
@@ -389,12 +459,16 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
                 remainingQuantity: newType === TradeType.BUY ? quantity : 0,
                 isFullySold: newType === TradeType.BUY ? 0 : existingTrade.isFullySold,
                 sellProcessed: newType === TradeType.SELL ? 0 : 1,
-            };// Update the trade record
+            };
+
+            // Update the trade record
             const result = await tradeQueries.update(updatedTrade, tx);
 
             if (!result) {
                 throw new HTTPException(500, { message: "Failed to update trade" });
-            } // Re-apply the trade effects with the updated values
+            }
+
+            // Re-apply the trade effects with the updated values
             const tradeType = updatedTrade.type;
 
             // Need to get the complete trade with all fields from DB
@@ -418,33 +492,35 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
     } catch (error: any) {
         console.error("Trade update error:", error);
 
-        // If it's already an HTTPException, just pass it through
+        // Get specific error message
+        let errorMessage = "Failed to update trade. Please check your data and try again.";
+        let _errorStatus = 500;
+
+        // If it's an HTTPException, extract the message and status
         if (error instanceof HTTPException) {
-            throw error;
-        }
+            errorMessage = error.message || errorMessage;
+            _errorStatus = error.status;
+        } else if (error && typeof error === "object" && error.message) { // Handle non-HTTPException errors with message property
+            errorMessage = error.message;
 
-        // If the error has a message property, use it for better error messaging
-        if (error && typeof error === "object" && error.message) {
-            // Extract specific error messages we want to show directly to users
-            if (error.message.includes("Insufficient shares")) {
-                throw new HTTPException(400, { message: error.message });
-            }
-
-            if (error.message.includes("Stock not found")) {
-                throw new HTTPException(404, { message: error.message });
-            }
-
-            if (error.message.includes("Client not found")) {
-                throw new HTTPException(404, { message: error.message });
-            }
-
-            if (error.message.includes("already been sold")) {
-                throw new HTTPException(400, { message: error.message });
+            // Customize error messages for better user experience
+            if (error.message.includes("brokerage has already been calculated")
+                || error.message.includes("brokerage calculation first")) {
+                errorMessage = "Cannot modify this trade as brokerage has already been calculated.";
+                _errorStatus = 409;
+            } else if (error.message.includes("already been sold")) {
+                _errorStatus = 400;
+            } else if (error.message.includes("Insufficient shares")) {
+                _errorStatus = 400;
             }
         }
 
-        // If we couldn't identify a specific error message, use a generic one
-        throw new HTTPException(500, { message: "Failed to update trade. Please check your data and try again." });
+        // Return a consistent error response format
+        return c.json({
+            success: false,
+            message: errorMessage,
+            error: errorMessage,
+        });
     }
 });
 
@@ -537,7 +613,30 @@ tradeRouter.delete("/delete/:id", zValidator("param", tradeGetOneSchema), async 
         const trade = await tradeQueries.findOne({ id });
         if (!trade) {
             throw new HTTPException(404, { message: "Trade not found" });
-        } // Use a transaction for all database operations to ensure consistency
+        }
+
+        // Check if brokerage has already been calculated for this trade
+        if (trade.lastBrokerageCalculated) {
+            const year = Math.floor(trade.lastBrokerageCalculated / 100);
+            const month = trade.lastBrokerageCalculated % 100;
+            throw new HTTPException(409, {
+                message: `Cannot delete this trade as brokerage has already been calculated for ${month}/${year}. Please delete the brokerage calculation first.`,
+            });
+        }
+
+        // Double check for any brokerage calculations linked to this trade
+        const dbCheck = getDB();
+        const brokerageDetailsForTrade = await dbCheck.query.brokerageDetails.findMany({
+            where: eq(brokerageDetails.tradeId, trade.id),
+        });
+
+        if (brokerageDetailsForTrade && brokerageDetailsForTrade.length > 0) {
+            throw new HTTPException(409, {
+                message: `Cannot delete this trade as it has associated brokerage calculations.`,
+            });
+        }
+
+        // Use a transaction for all database operations to ensure consistency
         const db = getDB();
         return await db.transaction(async (tx: TransactionType) => {
             // Reverse the effects of the trade first
@@ -554,32 +653,35 @@ tradeRouter.delete("/delete/:id", zValidator("param", tradeGetOneSchema), async 
     } catch (error: any) {
         console.error("Trade deletion error:", error);
 
+        // Get specific error message
+        let errorMessage = "Failed to delete trade. Please try again later.";
+        let _errorStatus = 500;
+
+        // If it's an HTTPException, extract the message and status
         if (error instanceof HTTPException) {
-            throw error;
-        }
+            errorMessage = error.message || errorMessage;
+            _errorStatus = error.status;
+        } else if (error && typeof error === "object" && error.message) { // Handle non-HTTPException errors with message property
+            errorMessage = error.message;
 
-        // If the error has a message property, use it for better error messaging
-        if (error && typeof error === "object" && error.message) {
-            // Extract specific error messages we want to show directly to users
-            if (error.message.includes("Insufficient shares")) {
-                throw new HTTPException(400, { message: error.message });
-            }
-
-            if (error.message.includes("Stock not found")) {
-                throw new HTTPException(404, { message: error.message });
-            }
-
-            if (error.message.includes("Trade not found")) {
-                throw new HTTPException(404, { message: error.message });
-            }
-
-            if (error.message.includes("already been sold")) {
-                throw new HTTPException(400, { message: error.message });
+            // Customize error messages for better user experience
+            if (error.message.includes("brokerage has already been calculated")
+                || error.message.includes("brokerage calculation first")) {
+                errorMessage = "Cannot delete this trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                _errorStatus = 409;
+            } else if (error.message.includes("already been sold")) {
+                _errorStatus = 400;
+            } else if (error.message.includes("Trade not found")) {
+                _errorStatus = 404;
             }
         }
 
-        // If we couldn't identify a specific error message, use a generic one
-        throw new HTTPException(500, { message: "Failed to delete trade. Please try again later." });
+        // Return a consistent error response format
+        return c.json({
+            success: false,
+            message: errorMessage,
+            error: errorMessage,
+        });
     }
 });
 

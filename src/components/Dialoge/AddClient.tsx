@@ -67,6 +67,7 @@ const AddClient: React.FC<AddClientProps> = ({
             mobileNo: "",
             email: "",
             address: "",
+            purseAmount: 0,
         },
         resolver: zodResolver(addClientSchema),
         mode: "onSubmit",
@@ -183,6 +184,7 @@ const AddClient: React.FC<AddClientProps> = ({
                     mobile: formData.mobileNo,
                     pan: formData.panNo,
                     address: formData.address && formData.address.trim() !== "" ? formData.address : undefined,
+                    purseAmount: formData.purseAmount,
                 };
 
                 // Execute the update mutation
@@ -195,6 +197,7 @@ const AddClient: React.FC<AddClientProps> = ({
                     mobile: formData.mobileNo || "",
                     pan: formData.panNo || "",
                     address: formData.address && formData.address.trim() !== "" ? formData.address : undefined,
+                    purseAmount: formData.purseAmount,
                 };
 
                 // Execute the create mutation
@@ -227,6 +230,7 @@ const AddClient: React.FC<AddClientProps> = ({
                     addClientForm.setValue("mobileNo", data.mobileNo || "");
                     addClientForm.setValue("email", data.email || "");
                     addClientForm.setValue("address", data.address || "");
+                    addClientForm.setValue("purseAmount", data.purseAmount || 0);
                 }, 0);
 
                 return () => clearTimeout(timer);
@@ -258,7 +262,7 @@ const AddClient: React.FC<AddClientProps> = ({
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="max-h-[calc(100vh-220px)] overflow-y-scroll">
+                <div className="max-h-[calc(100vh-220px)]">
                     <Form {...addClientForm}>
                         <form className="flex flex-col gap-4">
                             <div className="flex flex-col md:flex-row w-full gap-4">
@@ -346,6 +350,29 @@ const AddClient: React.FC<AddClientProps> = ({
                                                 placeholder="Address"
                                                 {...field ?? undefined}
                                                 className="border-none ring-0 focus:ring-0 focus:ring-offset-0"
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={addClientForm.control}
+                                name="purseAmount"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="Purse Amount"
+                                                value={field.value}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    // Allow empty input (will show as empty in UI but submit as 0)
+                                                    field.onChange(value === "" ? "" : Number.parseFloat(value) || 0);
+                                                }}
                                             />
                                         </FormControl>
                                         <FormMessage />

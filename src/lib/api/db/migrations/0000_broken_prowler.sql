@@ -66,6 +66,7 @@ CREATE TABLE `clients` (
 	`email` text NOT NULL,
 	`mobile` text NOT NULL,
 	`address` text,
+	`purse_amount` real DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );

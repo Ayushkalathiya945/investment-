@@ -45,6 +45,9 @@ type AddTradeProps = {
     onSuccess?: () => void;
     clientId?: number;
     editTradeId?: number;
+    // New props for controlling dialog state externally
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 };
 
 // Improved trade schema with proper validations
@@ -88,8 +91,14 @@ const AddTrade: React.FC<AddTradeProps> = ({
     onSuccess,
     clientId,
     editTradeId,
+    open: controlledOpen,
+    onOpenChange: setControlledOpen,
 }) => {
-    const [open, setOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
+
+    // Use either controlled or internal state
+    const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+    const setOpen = setControlledOpen || setInternalOpen;
     const [searchTerm, setSearchTerm] = useState("");
     const [openStockPopover, setOpenStockPopover] = useState(false);
     const [openClientPopover, setOpenClientPopover] = useState(false);
@@ -154,33 +163,93 @@ const AddTrade: React.FC<AddTradeProps> = ({
     // Fetch trade details if in edit mode
     const { data: tradeDetails, isLoading: loadingTradeDetails } = useQuery({
         queryKey: ["trade", editTradeId],
-        queryFn: () => editTradeId
-            ? getTradeById(editTradeId)
-            : null,
-        enabled: isEditMode,
+        queryFn: async () => {
+            if (!editTradeId)
+                return null;
+            try {
+                const trade = await getTradeById(editTradeId);
+                return trade;
+            } catch (error) {
+                console.error(`Failed to fetch trade #${editTradeId}:`, error);
+                toast.error(`Failed to load trade details: ${error instanceof Error ? error.message : "Unknown error"}`);
+                throw error;
+            }
+        },
+        enabled: isEditMode && open, // Only fetch when dialog is open and in edit mode
     });
 
     // Update form when trade details are loaded
     useEffect(() => {
         if (isEditMode && tradeDetails) {
-            // Ensure we have a valid exchange value (NSE or BSE)
-            const exchange = (tradeDetails.exchange === "BSE")
-                ? "BSE" as const
-                : "NSE" as const;
+            console.log("Populating form with trade details:", tradeDetails);
 
-            // //console.log(`Loading trade details with exchange: ${exchange} (original: ${tradeDetails.exchange})`);
+            try {
+                // Check if the response has a nested trade property
+                const tradeData = tradeDetails.trade ? tradeDetails.trade : tradeDetails;
 
-            tradeForm.reset({
-                clientId: tradeDetails.clientId,
-                symbol: tradeDetails.symbol,
-                exchange,
-                tradeType: tradeDetails.type,
-                quantity: tradeDetails.quantity,
-                price: tradeDetails.price,
-                tradeDate: tradeDetails.tradeDate.toString(),
-                notes: tradeDetails.notes || "",
-                status: tradeDetails.status,
-            });
+                console.log("Working with trade data:", tradeData);
+
+                // Ensure we have a valid exchange value (NSE or BSE)
+                const exchange = (tradeData.exchange === "BSE")
+                    ? "BSE" as const
+                    : "NSE" as const;
+
+                // Format the trade date, ensuring it's not undefined
+                let formattedTradeDate = "";
+                if (tradeData.tradeDate) {
+                    // Handle different date formats
+                    if (typeof tradeData.tradeDate === "number") {
+                        // If it's a timestamp number
+                        const dateObj = new Date(tradeData.tradeDate);
+                        formattedTradeDate = dateObj.toISOString().split("T")[0];
+                        console.log(`Converted timestamp ${tradeData.tradeDate} to date: ${formattedTradeDate}`);
+                    } else if (typeof tradeData.tradeDate === "string") {
+                        // If it's already a string, use as is or try to parse if needed
+                        if (tradeData.tradeDate.includes("T")) {
+                            // ISO format with time
+                            formattedTradeDate = tradeData.tradeDate.split("T")[0];
+                        } else {
+                            // Already in YYYY-MM-DD format
+                            formattedTradeDate = tradeData.tradeDate;
+                        }
+                        console.log(`Using string date: ${formattedTradeDate}`);
+                    } else if (tradeData.tradeDate instanceof Date) {
+                        // If it's a Date object
+                        formattedTradeDate = tradeData.tradeDate.toISOString().split("T")[0];
+                        console.log(`Converted Date object to: ${formattedTradeDate}`);
+                    }
+                } else {
+                    console.warn("Trade date is missing, using current date");
+                    formattedTradeDate = new Date().toISOString().split("T")[0];
+                }
+                // Log values before resetting form
+                console.log("Setting form values with:", {
+                    clientId: tradeData.clientId,
+                    symbol: tradeData.symbol,
+                    exchange,
+                    tradeType: tradeData.type,
+                    quantity: tradeData.quantity,
+                    price: tradeData.price,
+                    date: formattedTradeDate,
+                    notes: tradeData.notes || "",
+                });
+
+                // Reset form with all available data
+                tradeForm.reset({
+                    clientId: tradeData.clientId,
+                    symbol: tradeData.symbol,
+                    exchange,
+                    tradeType: tradeData.type,
+                    quantity: tradeData.quantity,
+                    price: tradeData.price,
+                    tradeDate: formattedTradeDate,
+                    notes: tradeData.notes || "",
+                    status: tradeData.status || "COMPLETED",
+                });
+            } catch (error) {
+                console.error("Error populating form with trade details:", error);
+                toast.error("Failed to load trade details properly. Please try again.");
+            }
         }
     }, [tradeDetails, isEditMode, tradeForm]);
 
@@ -247,12 +316,34 @@ const AddTrade: React.FC<AddTradeProps> = ({
             queryClient.invalidateQueries({ queryKey: ["trades"] });
             queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
             tradeForm.reset();
-            setOpen(false);
+            setOpen(false); // This will use the controlled setter if available
             if (onSuccess)
                 onSuccess();
         },
         onError: (error: any) => {
             console.error("Trade creation error:", error);
+
+            // Check specifically for brokerage calculation errors
+            if (error.message && (
+                error.message.includes("brokerage has already been calculated")
+                || error.message.includes("brokerage calculation first")
+                || error.isBrokerageConflict === true
+            )) {
+                // Special styling for brokerage conflict errors
+                toast.error(error.message, {
+                    duration: 10000, // Longer duration for important message
+                    icon: "🚫",
+                    style: {
+                        border: "2px solid #f43f5e",
+                        padding: "16px",
+                        color: "#f43f5e",
+                        fontWeight: "bold",
+                    },
+                });
+                return;
+            }
+
+            // Handle other specific error messages
             if (error.message
                 && !error.message.includes("Request failed with status code")
                 && !error.message.includes("Failed to create trade")) {
@@ -312,12 +403,33 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 queryClient.invalidateQueries({ queryKey: ["trades"] });
                 queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
                 tradeForm.reset();
-                setOpen(false);
+                setOpen(false); // This will use the controlled setter if available
                 if (onSuccess)
                     onSuccess();
             } catch (error: any) {
                 console.error("Trade update error:", error);
 
+                // Check specifically for brokerage calculation errors
+                if (error.message && (
+                    error.message.includes("brokerage has already been calculated")
+                    || error.message.includes("brokerage calculation first")
+                    || error.isBrokerageConflict === true
+                )) {
+                    // Special styling for brokerage conflict errors
+                    toast.error(error.message, {
+                        duration: 10000, // Longer duration for important message
+                        icon: "🚫",
+                        style: {
+                            border: "2px solid #f43f5e",
+                            padding: "16px",
+                            color: "#f43f5e",
+                            fontWeight: "bold",
+                        },
+                    });
+                    return;
+                }
+
+                // Handle other specific error messages
                 if (error.message
                     && !error.message.includes("Request failed with status code")
                     && !error.message.includes("Failed to update trade")) {
@@ -448,29 +560,37 @@ const AddTrade: React.FC<AddTradeProps> = ({
         } else {
             // Just close
             setOpen(false);
+
+            // If we're in edit mode, also clear form when closing
+            if (isEditMode) {
+                tradeForm.reset();
+            }
         }
     };
 
     return (
         <Dialog open={open} onOpenChange={handleDialogOpen}>
-            <DialogTrigger asChild>
-                <Button
-                    className="ml-auto bg-primary px-5 md:px-8 rounded-xl"
-                    disabled={isButtonLoading}
-                >
-                    {isButtonLoading
-                        ? (
-                                <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                            )
-                        : (
-                                <Plus size={18} />
-                            )}
-                    <span className="hidden md:flex">{name}</span>
-                </Button>
-            </DialogTrigger>
+            {/* Only show the DialogTrigger for Add mode, not Edit mode */}
+            {!isEditMode && (
+                <DialogTrigger asChild>
+                    <Button
+                        className="ml-auto bg-primary px-5 md:px-8 rounded-xl"
+                        disabled={isButtonLoading}
+                    >
+                        {isButtonLoading
+                            ? (
+                                    <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                )
+                            : (
+                                    <Plus size={18} />
+                                )}
+                        <span className="hidden md:flex">{name}</span>
+                    </Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-2xl min-w-[300px] p-6">
 
                 <DialogHeader>
@@ -1031,7 +1151,10 @@ const AddTrade: React.FC<AddTradeProps> = ({
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setOpen(false)}
+                            onClick={() => {
+                                setOpen(false);
+                                tradeForm.reset(); // Reset form when canceling
+                            }}
                         >
                             Cancel
                         </Button>

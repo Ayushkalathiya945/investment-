@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
+import env from "@/env";
 import { PeriodType } from "@/types/brokerage";
 
 import type { TransactionType } from "../index";
@@ -118,7 +119,7 @@ export async function findAllWithPagination(data: { page: number; limit: number;
                 month: startMonth,
                 year: quarterYear,
                 calculationPeriod: Number.parseInt(`${quarterYear}${startMonth.toString().padStart(2, "0")}`),
-                brokerageRate: 10,
+                brokerageRate: env.BROKERAGE_RATE,
                 totalDaysInMonth: 0,
                 totalHoldingValue: 0,
                 totalHoldingDays: 0,
@@ -706,8 +707,8 @@ export async function saveBrokerageDetails(
                         holdingDays: detail.holdingDays,
                         totalDaysInMonth: totalDays,
                         positionValue: detail.positionValue ? Number(detail.positionValue.toFixed(2)) : 0,
-                        monthlyBrokerageRate: 10, // 10% per month (fixed rate)
-                        dailyBrokerageRate: Number((10 / totalDays).toFixed(2)),
+                        monthlyBrokerageRate: env.BROKERAGE_RATE, // Monthly rate from env
+                        dailyBrokerageRate: Number((env.BROKERAGE_RATE / totalDays).toFixed(2)),
                         brokerageAmount: detail.brokerageAmount ? Number(detail.brokerageAmount.toFixed(2)) : 0,
                         calculationFormula: detail.calculationFormula,
                         // Handle optional fields for sold positions
@@ -735,8 +736,8 @@ export async function saveBrokerageDetails(
                         holdingDays: detail.holdingDays,
                         totalDaysInMonth: totalDays,
                         positionValue: detail.positionValue ? Number(detail.positionValue.toFixed(2)) : 0,
-                        monthlyBrokerageRate: 10,
-                        dailyBrokerageRate: Number((10 / totalDays).toFixed(2)),
+                        monthlyBrokerageRate: env.BROKERAGE_RATE,
+                        dailyBrokerageRate: Number((env.BROKERAGE_RATE / totalDays).toFixed(2)),
                         brokerageAmount: detail.brokerageAmount ? Number(detail.brokerageAmount.toFixed(2)) : 0,
                         calculationFormula: detail.calculationFormula,
                         isSoldInMonth: 0,
@@ -802,7 +803,7 @@ export async function batchSaveClientBrokerages(
             ...c.brokerageData,
             brokerageAmount: c.brokerageData.brokerageAmount ? Number(c.brokerageData.brokerageAmount.toFixed(2)) : 0,
             totalHoldingValue: c.brokerageData.totalHoldingValue ? Number(c.brokerageData.totalHoldingValue.toFixed(2)) : 0,
-            brokerageRate: c.brokerageData.brokerageRate ? Number(c.brokerageData.brokerageRate.toFixed(2)) : 10,
+            brokerageRate: c.brokerageData.brokerageRate ? Number(c.brokerageData.brokerageRate.toFixed(2)) : env.BROKERAGE_RATE,
         };
         return formattedData;
     });
@@ -882,8 +883,8 @@ export async function batchSaveClientBrokerages(
                             holdingDays: detail.holdingDays!,
                             totalDaysInMonth: totalDays,
                             positionValue: detail.positionValue ? Number(detail.positionValue.toFixed(2)) : 0,
-                            monthlyBrokerageRate: 10, // 10% per month (fixed rate)
-                            dailyBrokerageRate: Number((10 / totalDays).toFixed(2)),
+                            monthlyBrokerageRate: env.BROKERAGE_RATE, // Monthly rate from env
+                            dailyBrokerageRate: Number((env.BROKERAGE_RATE / totalDays).toFixed(2)),
                             brokerageAmount: detail.brokerageAmount ? Number(detail.brokerageAmount.toFixed(2)) : 0,
                             calculationFormula: detail.calculationFormula,
                             isSoldInMonth: detail.isSoldInMonth || 0,

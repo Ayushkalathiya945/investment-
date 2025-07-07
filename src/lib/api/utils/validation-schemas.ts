@@ -32,6 +32,7 @@ export const clientSchema = z.object({
         z.null(), // Allow null
         z.undefined(), // Allow undefined
     ]).optional(),
+    purseAmount: z.number().nonnegative("Purse amount must be non-negative").default(0).optional(),
 });
 
 export const updateClientSchema = clientSchema.partial().extend({

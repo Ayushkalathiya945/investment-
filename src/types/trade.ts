@@ -12,23 +12,34 @@ export type StockSymbolsResponse = {
 export type Trade = {
     id: number;
     clientId: number;
+    clientName: string;
     symbol: string;
     exchange: "NSE" | "BSE";
     type: "BUY" | "SELL";
     quantity: number;
     price: number;
-    tradeDate: string | Date;
+    tradeDate: string | Date | number; // Added number for timestamp format
     createdAt: string | Date;
     updatedAt: string | Date;
     status: "PENDING" | "COMPLETED" | "CANCELLED";
     notes?: string;
+    // Additional fields from your actual trade data
+    isFullySold?: number;
+    lastBrokerageCalculated?: string | null;
+    netAmount?: number;
+    originalQuantity?: number;
+    remainingQuantity?: number;
+    sellProcessed?: number;
 };
 
 // API Response wrapper for a single trade
 export type TradeResponse = {
     success: boolean;
     message: string;
-    data: Trade;
+    data: Trade | {
+        trade: Trade;
+        fifoInfo?: any[];
+    }; // Updated to handle nested trade structure
     error?: {
         issues?: Array<{ path: string; message: string }>;
         message?: string;

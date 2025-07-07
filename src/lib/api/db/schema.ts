@@ -21,6 +21,7 @@ export const clients = sqliteTable("clients", {
     email: text("email").notNull().unique(),
     mobile: text("mobile").notNull().unique(),
     address: text("address"),
+    purseAmount: real("purse_amount").notNull().default(0),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
     updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
 });
@@ -156,7 +157,7 @@ export const brokerages = sqliteTable("brokerages", {
     calculationPeriod: int("calculation_period").notNull(), // YYYYMM format
 
     // Calculation parameters
-    brokerageRate: real("brokerage_rate").notNull().default(10), // 10% per month
+    brokerageRate: real("brokerage_rate").notNull().default(10), // Default 10%, actual value from env
     totalDaysInMonth: int("total_days_in_month").notNull(), // Actual days in month
 
     // Summary fields
@@ -205,7 +206,7 @@ export const brokerageDetails = sqliteTable("brokerage_details", {
 
     // Value and brokerage calculation
     positionValue: real("position_value").notNull(), // quantity * buyPrice
-    monthlyBrokerageRate: real("monthly_brokerage_rate").notNull().default(10),
+    monthlyBrokerageRate: real("monthly_brokerage_rate").notNull().default(10), // Default 10%, actual value from env
     dailyBrokerageRate: real("daily_brokerage_rate").notNull(), // monthlyRate / totalDaysInMonth
     brokerageAmount: real("brokerage_amount").notNull(), // positionValue * dailyRate * holdingDays
 

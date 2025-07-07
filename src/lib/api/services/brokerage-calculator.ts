@@ -1,3 +1,5 @@
+import env from "@/env";
+
 import type { TransactionType } from "../db";
 import type {
     ExchangeType,
@@ -39,16 +41,13 @@ export function getDaysInMonth(month: number, year: number): number {
     return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-/**
- * Calculates pro-rated brokerage based on holding days in a month
- */
 export function calculateProRatedBrokerage(
     stockValue: number,
     daysHeld: number,
     totalDaysInMonth: number,
-    rate: number = 10, // Default 10% monthly rate
+    rate: number = env.BROKERAGE_RATE, // Default from env or fallback to 10% monthly rate
 ): number {
-    const fullMonthBrokerage = stockValue * (rate / 100); // Default 10% for full month
+    const fullMonthBrokerage = stockValue * (rate / 100);
     return (fullMonthBrokerage * daysHeld) / totalDaysInMonth;
 }
 
@@ -118,7 +117,7 @@ export async function calculateAndSaveMonthlyBrokerageOptimized(
                         totalDaysInMonth,
                         totalHoldingValue: clientBrokerage.totalHoldingValue,
                         totalHoldingDays: clientBrokerage.totalHoldingDays,
-                        brokerageRate: 10, // 10% per month (fixed rate)
+                        brokerageRate: env.BROKERAGE_RATE, // Rate from env variable
                         brokerageAmount: clientBrokerage.totalBrokerage,
                         totalPositions: clientBrokerage.details.length,
                         isPaid: 0,

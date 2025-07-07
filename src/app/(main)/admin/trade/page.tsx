@@ -1,15 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { Loader2, Pencil, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
+import type { ClientDropdownItem } from "@/types/client";
 import type { TradeFilterRequest } from "@/types/trade";
 
+import { getAllClientsForDropdown } from "@/api/client";
 import { formatDateForTradeApi, getAllTrades } from "@/api/trades";
 import AddTrade from "@/components/Dialoge/AddTrade";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MonthRangePicker from "@/components/ui/monthRangePicker";
 import { Pagination } from "@/components/ui/pagination";
@@ -48,6 +51,29 @@ const TradePage: React.FC = () => {
     const [clientId, setClientId] = useState<number | undefined>(
         clientIdParam ? Number.parseInt(clientIdParam) : undefined,
     );
+    const [clients, setClients] = useState<ClientDropdownItem[]>([]);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
+
+    // State to track which trade is being edited
+    const [editTradeId, setEditTradeId] = useState<number | undefined>();
+    const [showEditDialog, setShowEditDialog] = useState(false);
+
+    // Function to handle edit button click
+    const handleEditTrade = (tradeId: number) => {
+        setEditTradeId(tradeId);
+        setShowEditDialog(true);
+    };
+
+    // Function to handle dialog close
+    const handleDialogOpenChange = (open: boolean) => {
+        setShowEditDialog(open);
+        if (!open) {
+            // Reset the edit trade ID when dialog is closed
+            setTimeout(() => {
+                setEditTradeId(undefined);
+            }, 300); // Small delay to ensure dialog animation completes
+        }
+    };
 
     // Update URL with current filters
     const updateUrlWithFilters = () => {
@@ -72,6 +98,24 @@ const TradePage: React.FC = () => {
     useEffect(() => {
         updateUrlWithFilters();
     }, [clientId, searchTerm, tradeType, currentPage, dateRange]);
+
+    // Fetch clients for dropdown
+    useEffect(() => {
+        const fetchClients = async () => {
+            setIsLoadingClients(true);
+            try {
+                const clientsData = await getAllClientsForDropdown();
+                setClients(clientsData);
+            } catch (error) {
+                console.error("Error fetching clients:", error);
+                toast.error("Failed to load client list");
+            } finally {
+                setIsLoadingClients(false);
+            }
+        };
+
+        fetchClients();
+    }, []);
 
     const filterParams: TradeFilterRequest = {
         page: currentPage,
@@ -152,9 +196,8 @@ const TradePage: React.FC = () => {
         return `${dd}/${mm}/${yyyy}`;
     }
 
-    const handleClientIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        if (value === "") {
+    const handleClientChange = (value: string) => {
+        if (value === "all") {
             setClientId(undefined);
         } else {
             const numValue = Number.parseInt(value);
@@ -194,6 +237,21 @@ const TradePage: React.FC = () => {
                         name="Add Trade"
                         onSuccess={() => refetch()}
                     />
+
+                    {/* Separate dialog for editing trades */}
+                    {editTradeId && (
+                        <AddTrade
+                            name="Edit Trade"
+                            editTradeId={editTradeId}
+                            onSuccess={() => {
+                                refetch();
+                                setShowEditDialog(false);
+                                setTimeout(() => setEditTradeId(undefined), 300);
+                            }}
+                            open={showEditDialog}
+                            onOpenChange={handleDialogOpenChange}
+                        />
+                    )}
                 </div>
             </div>
 
@@ -213,13 +271,31 @@ const TradePage: React.FC = () => {
                     />
                 </div>
                 <div className="w-full md:w-1/3">
-                    <Input
-                        type="number"
-                        placeholder="Filter by Client ID..."
-                        value={clientId !== undefined ? clientId : ""}
-                        onChange={handleClientIdChange}
-                        className="w-full rounded-xl bg-white border border-border text-sm"
-                    />
+                    <Select
+                        value={clientId ? String(clientId) : "all"}
+                        onValueChange={handleClientChange}
+                    >
+                        <SelectTrigger className="w-full ring-0">
+                            <SelectValue placeholder="Select Client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Clients</SelectItem>
+                            {clients.map(client => (
+                                <SelectItem
+                                    key={client.id}
+                                    value={String(client.id)}
+                                >
+                                    {client.name}
+                                </SelectItem>
+                            ))}
+                            {isLoadingClients && (
+                                <div className="flex items-center justify-center p-2">
+                                    <Loader2 className="w-4 h-4 animate-spin text-primary mr-2" />
+                                    Loading clients...
+                                </div>
+                            )}
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div className="flex min-w-50 w-full md:w-1/3">
                     <Select value={tradeType || "ALL"} onValueChange={handleTradeTypeChange}>
@@ -261,13 +337,14 @@ const TradePage: React.FC = () => {
                                         <TableHeader>
                                             <TableRow className="bg-[#F9F9F9] text-[16px] font-semibold w-full justify-between items-center gap-4 rounded-lg py-3">
                                                 <TableHead className="rounded-tl-xl">No.</TableHead>
-                                                <TableHead>Client ID</TableHead>
+                                                <TableHead>ClientName </TableHead>
                                                 <TableHead>Stock</TableHead>
                                                 <TableHead>Exchange</TableHead>
                                                 <TableHead>Type</TableHead>
                                                 <TableHead>Quantity</TableHead>
                                                 <TableHead>Share Price</TableHead>
-                                                <TableHead className="rounded-tr-xl">Date</TableHead>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead className="rounded-tr-xl">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
 
@@ -281,7 +358,7 @@ const TradePage: React.FC = () => {
                                                 return (
                                                     <TableRow key={trade.id} className="w-full py-10 gap-4 mx-3">
                                                         <TableCell>{(pagination.currentPage - 1) * PAGE_LIMIT + index + 1}</TableCell>
-                                                        <TableCell>{trade.clientId}</TableCell>
+                                                        <TableCell>{trade.clientName}</TableCell>
                                                         <TableCell>{trade.symbol}</TableCell>
                                                         <TableCell>{trade.exchange}</TableCell>
                                                         <TableCell>
@@ -302,6 +379,19 @@ const TradePage: React.FC = () => {
                                                         <TableCell>{trade.quantity}</TableCell>
                                                         <TableCell>{trade.price}</TableCell>
                                                         <TableCell>{tradeDate}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+
+                                                                <Button
+                                                                    className="h-8 bg-primary px-5 md:px-10 rounded-xl"
+                                                                    onClick={() => handleEditTrade(trade.id)}
+                                                                >
+                                                                    <Pencil size={14} />
+                                                                    <span className="hidden md:flex">Edit</span>
+                                                                </Button>
+
+                                                            </div>
+                                                        </TableCell>
                                                     </TableRow>
                                                 );
                                             })}

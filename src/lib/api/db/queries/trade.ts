@@ -58,14 +58,29 @@ export async function findAllWithPagination(data: { page: number; limit: number;
         orderBy: [desc(trades.createdAt)],
         limit: data.limit,
         offset: (data.page - 1) * data.limit,
+        with: {
+            client: {
+                columns: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
     });
+
+    // Transform the result to include clientName directly in the trade object
+    const tradesWithClientName = tradesData.map((trade: any) => ({
+        ...trade,
+        clientName: trade.client?.name || "Unknown Client",
+        client: undefined, // Remove the nested client object
+    }));
 
     const tradeCount = await getDB(tx)
         .select({ count: sql<number>`count(*)` })
         .from(trades)
         .where(and(...conditions));
 
-    return { trades: tradesData, count: tradeCount && tradeCount.length > 0 ? tradeCount[0].count : 0 };
+    return { trades: tradesWithClientName, count: tradeCount && tradeCount.length > 0 ? tradeCount[0].count : 0 };
 }
 
 export async function calculateTotalTradeAmount(data: { clientId?: number; from?: number; to?: number }, tx?: TransactionType) {
