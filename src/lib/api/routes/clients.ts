@@ -322,9 +322,9 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
         });
 
         // Calculate remaining purse amount (considering only trades, not payments or brokerage)
-        const totalBuyValue = financialTotals.totalBuyTrades || 0; // Total cost 
-        const totalSellValue = financialTotals.totalSellTrades || 0; // Total revenue 
-        const totalInitialPurse = financialTotals.totalPurseAmount || 0; // Total initial purse amount 
+        const totalBuyValue = financialTotals.totalBuyTrades || 0; // Total cost
+        const totalSellValue = financialTotals.totalSellTrades || 0; // Total revenue
+        const totalInitialPurse = financialTotals.totalPurseAmount || 0; // Total initial purse amount
         const remainingPurseAmount = totalInitialPurse - totalBuyValue + totalSellValue;
 
         const response = {
