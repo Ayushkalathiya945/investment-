@@ -13,7 +13,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, value, label, className }) =>
     return (
         <div
             className={cn(
-                "group flex flex-col items-center justify-between gap-2 rounded-xl border-t border-x border-gray-100 bg-white p-4 shadow-xl w-full max-w-xs hover:bg-gradient-to-t from-[#e5f8ff] via-[#EFF6FF] to-[#cef2ff]",
+                "group flex flex-col items-center justify-between gap-2 rounded-xl border-t border-x border-gray-100 bg-white p-4 shadow-xl w-full md:max-w-xs hover:bg-gradient-to-t from-[#e5f8ff] via-[#EFF6FF] to-[#cef2ff]",
                 className,
             )}
         >

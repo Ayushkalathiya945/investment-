@@ -205,7 +205,7 @@ const Client: React.FC = () => {
                     <AddClient name="Add Client" />
                 </div>
             </div>
-            <div className="grid 2xl:grid-cols-4 xl:grid-cols-4 lg:grid-cols-2 md:grid-cols-2 grid-cols-1 gap-3 px-2">
+            <div className="grid xl:grid-cols-4 md:grid-cols-2 grid-cols-1 justify-between gap-3 px-2">
                 <StatCard icon={<Users />} value={analytics.totalClient} label="Total Clients" />
                 <StatCard
                     icon={<IndianRupee />}
