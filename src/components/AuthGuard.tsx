@@ -23,7 +23,7 @@ function AuthGuard({ children }: AuthGuardProps) {
                 const authStatus = await checkAuth();
 
                 if (!authStatus) {
-                    router.replace("/auth"); // Redirect to login if not authenticated
+                    router.replace("/auth");
                     return;
                 }
 

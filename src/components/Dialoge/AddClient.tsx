@@ -41,19 +41,16 @@ const AddClient: React.FC<AddClientProps> = ({
     name,
     onSuccess,
 }) => {
-    // Add state for dialog open/close
     const [open, setOpen] = useState(false);
-    // State to track if we're editing
+
     const [isEditing, setIsEditing] = useState(false);
-    // Get query client for cache invalidation
+
     const queryClient = useQueryClient();
 
-    // Handle dialog open/close to properly reset editing state
     const handleOpenChange = (newOpen: boolean) => {
         setOpen(newOpen);
-        // If dialog is closing, reset editing state
+
         if (!newOpen) {
-            // Small delay to ensure smooth closing animation
             setTimeout(() => {
                 setIsEditing(false);
             }, 300);
@@ -67,7 +64,7 @@ const AddClient: React.FC<AddClientProps> = ({
             mobileNo: "",
             email: "",
             address: "",
-            purseAmount: 0,
+            purseAmount: undefined,
         },
         resolver: zodResolver(addClientSchema),
         mode: "onSubmit",
@@ -81,11 +78,9 @@ const AddClient: React.FC<AddClientProps> = ({
             addClientForm.reset();
             setOpen(false);
 
-            // Invalidate queries to refetch data
             queryClient.invalidateQueries({ queryKey: ["clients"] });
             queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
 
-            // Call the onSuccess callback if provided
             if (onSuccess)
                 onSuccess();
         },
@@ -100,36 +95,29 @@ const AddClient: React.FC<AddClientProps> = ({
             addClientForm.reset();
             setOpen(false);
 
-            // Invalidate queries to refetch data
             queryClient.invalidateQueries({ queryKey: ["clients"] });
             queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
-            queryClient.invalidateQueries({ queryKey: ["client"] }); // For the client detail page
+            queryClient.invalidateQueries({ queryKey: ["client"] });
 
-            // Call the onSuccess callback if provided
             if (onSuccess)
                 onSuccess();
         },
         onError: handleMutationError,
     });
 
-    // Common error handler for both mutations
     function handleMutationError(error: any) {
         console.error("Error details:", error);
 
         let errorMessage = isEditing ? "Failed to update client" : "Failed to create client";
 
-        // Handle Zod validation errors returned from the backend
         if (error.error?.issues && Array.isArray(error.error.issues)) {
-            // Get first validation error message
             const firstError = error.error.issues[0];
             errorMessage = firstError.message || errorMessage;
 
-            // Set form errors for the specific fields
             error.error.issues.forEach((issue: any) => {
                 if (issue.path && issue.path.length > 0) {
                     const fieldName = issue.path[0];
 
-                    // Map backend field names to form field names if needed
                     const formField = fieldName === "mobile"
                         ? "mobileNo"
                         : fieldName === "pan" ? "panNo" : fieldName;
@@ -142,10 +130,8 @@ const AddClient: React.FC<AddClientProps> = ({
                 }
             });
         } else if (error.message) {
-            // Check if the error message contains our specific backend messages
             if (error.message.includes("Email already exists")) {
                 errorMessage = "Email address already registered";
-                // Set the form error for the specific field
                 addClientForm.setError("email", { message: "This email is already in use" });
             } else if (error.message.includes("Mobile number already exists")) {
                 errorMessage = "Mobile number already registered";
@@ -154,12 +140,10 @@ const AddClient: React.FC<AddClientProps> = ({
                 errorMessage = "PAN number already registered";
                 addClientForm.setError("panNo", { message: "This PAN number is already in use" });
             } else {
-                // Use the error message from the server if available
                 errorMessage = error.message;
             }
         }
 
-        // If we have data from the server response, use that for more specific errors
         if (error.data) {
             errorMessage = error.data.message || errorMessage;
         }
@@ -168,15 +152,12 @@ const AddClient: React.FC<AddClientProps> = ({
     }
 
     const onSubmit = async (formData: AddClientField) => {
-        // Clear any previous form errors before submission
         addClientForm.clearErrors();
 
-        // Show loading toast
         const loadingToast = toast.loading(isEditing ? "Updating client..." : "Creating new client...");
 
         try {
             if (isEditing && data?.id) {
-                // Update existing client
                 const clientData: ClientUpdateRequest = {
                     id: Number.parseInt(data.id),
                     name: formData.name,
@@ -187,10 +168,8 @@ const AddClient: React.FC<AddClientProps> = ({
                     purseAmount: formData.purseAmount,
                 };
 
-                // Execute the update mutation
                 await updateClientMutation.mutateAsync(clientData);
             } else {
-                // Create new client
                 const clientData: ClientCreateRequest = {
                     name: formData.name || "",
                     email: formData.email || "",
@@ -200,42 +179,32 @@ const AddClient: React.FC<AddClientProps> = ({
                     purseAmount: formData.purseAmount,
                 };
 
-                // Execute the create mutation
                 await createClientMutation.mutateAsync(clientData);
             }
 
-            // Dismiss the loading toast on success
             toast.dismiss(loadingToast);
         } catch (error: any) {
-            // Dismiss the loading toast on error
             toast.dismiss(loadingToast);
 
-            // Additional error handling if needed
             console.error(isEditing ? "Client update error:" : "Client creation error:", error);
-
-            // Error is handled by the mutation's onError callback
         }
     };
 
-    // Reset form when dialog opens
     useEffect(() => {
         if (open) {
             if (data && data.id) {
-                // We're editing an existing client
                 const timer = setTimeout(() => {
                     setIsEditing(true);
-                    // Set form values
                     addClientForm.setValue("name", data.name || "");
                     addClientForm.setValue("panNo", data.panNo || "");
                     addClientForm.setValue("mobileNo", data.mobileNo || "");
                     addClientForm.setValue("email", data.email || "");
                     addClientForm.setValue("address", data.address || "");
-                    addClientForm.setValue("purseAmount", data.purseAmount || 0);
+                    addClientForm.setValue("purseAmount", data.purseAmount || undefined);
                 }, 0);
 
                 return () => clearTimeout(timer);
             } else {
-                // We're creating a new client
                 const timer = setTimeout(() => {
                     setIsEditing(false);
                     addClientForm.reset();
@@ -370,7 +339,6 @@ const AddClient: React.FC<AddClientProps> = ({
                                                 value={field.value}
                                                 onChange={(e) => {
                                                     const value = e.target.value;
-                                                    // Allow empty input (will show as empty in UI but submit as 0)
                                                     field.onChange(value === "" ? "" : Number.parseFloat(value) || 0);
                                                 }}
                                             />

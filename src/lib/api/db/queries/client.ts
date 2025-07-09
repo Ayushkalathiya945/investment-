@@ -160,6 +160,8 @@ export async function calculateFinancialTotalsByDateRange(
             ? new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999)
             : null;
 
+        // console.log("Calculating financial totals for date range:", { from, to, endOfDayTo });
+
         // Total client count
         const clientCountQuery = db
             .select({ count: sql<number>`COUNT(${clients.id})` })
@@ -170,8 +172,18 @@ export async function calculateFinancialTotalsByDateRange(
         if (to)
             clientCountQuery.where(lte(clients.createdAt, endOfDayTo!));
 
-        // Calculate portfolio value based on current holdings (BUY trades that aren't fully sold)
-        // This represents the cost of current holdings (what was paid), not the current market value
+        const baseConditions = [
+            eq(trades.type, TradeType.BUY),
+            eq(trades.isFullySold, 0),
+        ];
+
+        if (from && to) {
+            baseConditions.push(
+                gte(trades.tradeDate, new Date(from).getTime()),
+                lte(trades.tradeDate, endOfDayTo!.getTime()),
+            );
+        }
+
         const portfolioValueQuery = db
             .select({
                 totalValue: sql<number>`COALESCE(SUM(
@@ -183,14 +195,7 @@ export async function calculateFinancialTotalsByDateRange(
     ), 0)`,
             })
             .from(trades)
-            .where(
-                and(eq(trades.type, TradeType.BUY), eq(trades.isFullySold, 0)),
-            );
-
-        // Only filter by the "to" date - we want all holdings up to the end date
-        // We don't filter by "from" date because we want ALL current holdings regardless of purchase date
-        if (to)
-            portfolioValueQuery.where(lte(trades.createdAt, endOfDayTo!));
+            .where(and(...baseConditions));
 
         // Brokerage
         const brokerageQuery = db

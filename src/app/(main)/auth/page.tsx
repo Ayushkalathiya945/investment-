@@ -48,7 +48,7 @@ const Auth: React.FC = () => {
                 localStorage.setItem("user", JSON.stringify(result.admin));
                 router.push("/admin/client");
             } else {
-                toast.error("Invalid login response"); // fallback if no token returned
+                toast.error("Invalid login response");
             }
         } catch (err) {
             console.error("Login error:", err);
@@ -56,10 +56,8 @@ const Auth: React.FC = () => {
         }
     };
 
-    // State to track loading during authentication check
     const [isAuthChecking, setIsAuthChecking] = useState(true);
 
-    // Check if user is already logged in and verify token
     useEffect(() => {
         async function verifyAuthentication() {
             try {
@@ -84,7 +82,6 @@ const Auth: React.FC = () => {
         if (typeof window !== "undefined") {
             verifyAuthentication();
         } else {
-            // Use a timeout to avoid direct setState in useEffect
             const timer = setTimeout(() => {
                 setIsAuthChecking(false);
             }, 0);
@@ -93,7 +90,6 @@ const Auth: React.FC = () => {
         }
     }, [router]);
 
-    // Show loading state during authentication check
     if (isAuthChecking) {
         return (
             <div className="h-screen w-screen flex items-center justify-center">

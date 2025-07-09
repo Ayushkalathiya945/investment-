@@ -77,13 +77,6 @@ const ClientDetail: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ["client", clientId] });
     };
 
-    // Handle successful payment addition
-    const handlePaymentSuccess = () => {
-        // Refetch client data to update financial stats
-        queryClient.invalidateQueries({ queryKey: ["client", clientId] });
-        // toast.success("Payment added successfully for this client");
-    };
-
     // Go back to clients page
     const handleBackClick = () => {
         router.push("/admin/client");
@@ -147,11 +140,13 @@ const ClientDetail: React.FC = () => {
                     icon={<IndianRupee />}
                     value={typeof client.totalTradeAmount === "number" ? `₹${client.totalTradeAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Total Portfolio Value"
+                    isLoading={isLoading}
                 />
                 <StatCard
                     icon={<Wallet />}
                     value={typeof client.purseAmount === "number" ? `₹${client.purseAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Initial Purse Amount"
+                    isLoading={isLoading}
                 />
                 {/* Show remaining purse amount from API */}
                 <StatCard
@@ -160,6 +155,7 @@ const ClientDetail: React.FC = () => {
                         ? `₹${client.remainingPurseAmount.toLocaleString("en-IN")}`
                         : "₹0"}
                     label="Remaining Purse Amount"
+                    isLoading={isLoading}
                 />
                 {/* Display total sold stock amount */}
                 {/* <StatCard
@@ -167,16 +163,19 @@ const ClientDetail: React.FC = () => {
                     value={typeof client.totalSoldAmount === "number" ?
                         `₹${client.totalSoldAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Sold Stock Amount"
+                    isLoading={isLoading}
                 /> */}
                 <StatCard
                     icon={<TrendingUp />}
                     value={typeof client.totalBrokerageAmount === "number" ? `₹${client.totalBrokerageAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Total Fees"
+                    isLoading={isLoading}
                 />
                 <StatCard
                     icon={<CreditCard />}
                     value={typeof client.totalPaymentAmount === "number" ? `₹${client.totalPaymentAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Total Payments"
+                    isLoading={isLoading}
                 />
             </div>
 
@@ -252,7 +251,6 @@ const ClientDetail: React.FC = () => {
                         <AddPayment
                             name="Add Payment"
                             clientId={clientId}
-                            onSuccess={handlePaymentSuccess}
                         />
                     </div>
 

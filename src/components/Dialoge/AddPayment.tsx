@@ -43,14 +43,12 @@ import DatePicker from "../ui/datePicker";
 
 type AddPaymentProps = {
     name?: string;
-    clientId?: number; // Optional client ID if coming from a specific client page
-    onSuccess?: () => void;
+    clientId?: number;
 };
 
 const AddPayment: React.FC<AddPaymentProps> = ({
     name = "Add Payment",
     clientId,
-    onSuccess,
 }) => {
     const [open, setOpen] = useState(false);
     const [clients, setClients] = useState<{ id: number; name: string }[]>([]);
@@ -58,7 +56,6 @@ const AddPayment: React.FC<AddPaymentProps> = ({
 
     const queryClient = useQueryClient();
 
-    // Define the form with validation schema
     const addPaymentForm = useForm<AddPaymentField>({
         resolver: zodResolver(addPaymentSchema),
         defaultValues: {
@@ -69,13 +66,12 @@ const AddPayment: React.FC<AddPaymentProps> = ({
         },
     });
 
-    // Fetch clients list for the dropdown
     const fetchClients = async () => {
         setIsLoadingClients(true);
         try {
             const filterParams: ClientFilterRequest = {
                 page: 1,
-                limit: 100, // Get a large number to have all clients
+                limit: 20,
             };
 
             const response = await getAllClients(filterParams);
@@ -94,25 +90,18 @@ const AddPayment: React.FC<AddPaymentProps> = ({
         }
     };
 
-    // Fetch clients when dialog opens
     useEffect(() => {
         if (open) {
             fetchClients();
-            // Reset form when dialog opens with default values
             addPaymentForm.reset({
                 client: clientId ? String(clientId) : "",
                 date: new Date().toISOString(),
-                amount: 0,
+                amount: undefined,
                 description: "",
             });
-
-            // if (clientId) {
-            //     //console.log("Client ID provided through props:", clientId);
-            // }
         }
     }, [open, clientId, addPaymentForm]);
 
-    // Set up the create payment mutation
     const createPaymentMutation = useMutation({
         mutationFn: (paymentData: PaymentCreateRequest) => createPayment(paymentData),
         onSuccess: () => {
@@ -120,24 +109,16 @@ const AddPayment: React.FC<AddPaymentProps> = ({
             addPaymentForm.reset();
             setOpen(false);
 
-            // Invalidate queries to refetch payment data
             queryClient.invalidateQueries({ queryKey: ["payments"] });
 
-            // If this payment was for a specific client, also invalidate that client's data
             if (clientId) {
                 queryClient.invalidateQueries({ queryKey: ["client", clientId] });
             }
-
-            // Call the onSuccess callback if provided
-            if (onSuccess)
-                onSuccess();
         },
         onError: (error: any) => {
             console.error("Payment mutation error:", error);
 
-            // Handle detailed validation errors
             if (error.error?.issues) {
-                // Handle Zod validation errors
                 const issues = error.error.issues;
                 issues.forEach((issue: any) => {
                     const fieldName = issue.path[0] as keyof AddPaymentField;
@@ -147,7 +128,6 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                 });
                 toast.error("Please fix the errors in the form");
             } else {
-                // Handle general error
                 const errorMessage = error.message || "Failed to record payment";
                 toast.error(errorMessage);
             }
@@ -155,35 +135,27 @@ const AddPayment: React.FC<AddPaymentProps> = ({
     });
 
     const onSubmit = async (data: AddPaymentField) => {
-        // Clear any previous form errors
         addPaymentForm.clearErrors();
 
-        // Get client ID - first try from props, then from form data
-        // If clientId prop is provided, use that (for when adding from client detail page)
-        // Otherwise use the selected client from the dropdown
         const selectedClientId = clientId || Number.parseInt(data.client || "0");
         if (!selectedClientId) {
             addPaymentForm.setError("client", { message: "Please select a client" });
             return;
         }
 
-        // Validate amount
         if (!data.amount || data.amount <= 0) {
             addPaymentForm.setError("amount", { message: "Amount must be greater than 0" });
             return;
         }
 
-        // Validate date
         if (!data.date) {
             addPaymentForm.setError("date", { message: "Please select a date" });
             return;
         }
 
-        // Show loading toast
         const loadingToast = toast.loading("Recording payment...");
 
         try {
-            // Prepare payment data for API
             const paymentData: PaymentCreateRequest = {
                 clientId: selectedClientId,
                 amount: data.amount || 0,
@@ -193,12 +165,10 @@ const AddPayment: React.FC<AddPaymentProps> = ({
 
             console.error("Submitting payment data:", paymentData);
 
-            // Submit payment
             await createPaymentMutation.mutateAsync(paymentData);
             toast.dismiss(loadingToast);
         } catch {
             toast.dismiss(loadingToast);
-            // Error is handled by the mutation's onError callback
         }
     };
 
@@ -230,14 +200,12 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                                         <FormControl>
                                             {clientId
                                                 ? (
-                                                    // If clientId is provided via props, show the client name or a placeholder
                                                         <div className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                                                             {clients.find(c => c.id === clientId)?.name
                                                                 || `Client ID: ${clientId} (loading...)`}
                                                         </div>
                                                     )
                                                 : (
-                                                    // Otherwise show the dropdown
                                                         <Select
                                                             disabled={isLoadingClients}
                                                             value={field.value}
@@ -292,11 +260,18 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                                                 type="number"
                                                 placeholder="Amount"
                                                 {...field}
+                                                value={field.value === undefined ? "" : field.value}
                                                 onChange={(e) => {
-                                                    const value = Number.parseFloat(e.target.value);
-                                                    field.onChange(Number.isNaN(value) ? 0 : value);
+                                                    const value = e.target.value;
+                                                    if (value === "") {
+                                                        field.onChange(undefined);
+                                                    } else {
+                                                        const num = Number.parseFloat(value);
+                                                        field.onChange(Number.isNaN(num) ? undefined : num);
+                                                    }
                                                 }}
                                             />
+
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

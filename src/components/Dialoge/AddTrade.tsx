@@ -45,12 +45,10 @@ type AddTradeProps = {
     onSuccess?: () => void;
     clientId?: number;
     editTradeId?: number;
-    // New props for controlling dialog state externally
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
 };
 
-// Improved trade schema with proper validations
 const tradeSchema = z.object({
     clientId: z.number().int().positive({ message: "Please select a valid client" }),
     symbol: z.string().min(1, { message: "Stock symbol is required" }),
@@ -106,7 +104,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
     const queryClient = useQueryClient();
     const isEditMode = Boolean(editTradeId);
 
-    // Initialize form with default values
     const tradeForm = useForm<TradeFormValues>({
         defaultValues: {
             clientId: clientId || undefined,
@@ -122,7 +119,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
         mode: "onSubmit",
     });
 
-    // Fetch clients for dropdown
     const { data: clientsDropdown = [], isLoading: loadingClients } = useQuery({
         queryKey: ["clientsDropdown"],
         queryFn: getAllClientsForDropdown,
@@ -130,7 +126,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
         refetchOnWindowFocus: false,
     });
 
-    // Fetch stock symbols - only when dialog is open
     const { data: stockSymbols, isLoading: loadingStocks, error: stockError } = useQuery({
         queryKey: ["stockSymbols"],
         queryFn: async () => {
@@ -148,7 +143,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 throw error;
             }
         },
-        // Only enable the query when the dialog is open
+
         enabled: open,
         staleTime: 5 * 60 * 1000,
         retry: (failureCount, error: any) => {
@@ -160,7 +155,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
         refetchOnWindowFocus: false,
     });
 
-    // Fetch trade details if in edit mode
     const { data: tradeDetails, isLoading: loadingTradeDetails } = useQuery({
         queryKey: ["trade", editTradeId],
         queryFn: async () => {
@@ -175,46 +169,36 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 throw error;
             }
         },
-        enabled: isEditMode && open, // Only fetch when dialog is open and in edit mode
+        enabled: isEditMode && open,
     });
 
-    // Update form when trade details are loaded
     useEffect(() => {
         if (isEditMode && tradeDetails) {
             console.log("Populating form with trade details:", tradeDetails);
 
             try {
-                // Check if the response has a nested trade property
                 const tradeData = tradeDetails.trade ? tradeDetails.trade : tradeDetails;
 
                 console.log("Working with trade data:", tradeData);
 
-                // Ensure we have a valid exchange value (NSE or BSE)
                 const exchange = (tradeData.exchange === "BSE")
                     ? "BSE" as const
                     : "NSE" as const;
 
-                // Format the trade date, ensuring it's not undefined
                 let formattedTradeDate = "";
                 if (tradeData.tradeDate) {
-                    // Handle different date formats
                     if (typeof tradeData.tradeDate === "number") {
-                        // If it's a timestamp number
                         const dateObj = new Date(tradeData.tradeDate);
                         formattedTradeDate = dateObj.toISOString().split("T")[0];
                         console.log(`Converted timestamp ${tradeData.tradeDate} to date: ${formattedTradeDate}`);
                     } else if (typeof tradeData.tradeDate === "string") {
-                        // If it's already a string, use as is or try to parse if needed
                         if (tradeData.tradeDate.includes("T")) {
-                            // ISO format with time
                             formattedTradeDate = tradeData.tradeDate.split("T")[0];
                         } else {
-                            // Already in YYYY-MM-DD format
                             formattedTradeDate = tradeData.tradeDate;
                         }
                         console.log(`Using string date: ${formattedTradeDate}`);
                     } else if (tradeData.tradeDate instanceof Date) {
-                        // If it's a Date object
                         formattedTradeDate = tradeData.tradeDate.toISOString().split("T")[0];
                         console.log(`Converted Date object to: ${formattedTradeDate}`);
                     }
@@ -222,7 +206,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     console.warn("Trade date is missing, using current date");
                     formattedTradeDate = new Date().toISOString().split("T")[0];
                 }
-                // Log values before resetting form
+
                 console.log("Setting form values with:", {
                     clientId: tradeData.clientId,
                     symbol: tradeData.symbol,
@@ -234,7 +218,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     notes: tradeData.notes || "",
                 });
 
-                // Reset form with all available data
                 tradeForm.reset({
                     clientId: tradeData.clientId,
                     symbol: tradeData.symbol,
@@ -253,7 +236,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
         }
     }, [tradeDetails, isEditMode, tradeForm]);
 
-    // Format stock symbols for dropdown
     const formattedStocks = React.useMemo(() => {
         if (!stockSymbols)
             return [];
@@ -263,7 +245,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
             const nseArray = stockSymbols.nse || [];
             const bseArray = stockSymbols.bse || [];
 
-            // Format NSE stocks
             if (Array.isArray(nseArray) && nseArray.length > 0) {
                 const nseStocks = nseArray.map(symbol => ({
                     label: `${symbol}-NSE`,
@@ -273,7 +254,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 result.push(...nseStocks);
             }
 
-            // Format BSE stocks
             if (Array.isArray(bseArray) && bseArray.length > 0) {
                 const bseStocks = bseArray.map(symbol => ({
                     label: `${symbol}-BSE`,
@@ -307,31 +287,27 @@ const AddTrade: React.FC<AddTradeProps> = ({
         );
     }, [formattedStocks, searchTerm]);
 
-    // Create trade mutation
     const createTradeMutation = useMutation({
         mutationFn: createTrade,
         onSuccess: (response: { data: Trade; message: string }) => {
-            // Use the success message from the API response
             toast.success(response.message || "Trade created successfully");
             queryClient.invalidateQueries({ queryKey: ["trades"] });
             queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
             tradeForm.reset();
-            setOpen(false); // This will use the controlled setter if available
+            setOpen(false);
             if (onSuccess)
                 onSuccess();
         },
         onError: (error: any) => {
             console.error("Trade creation error:", error);
 
-            // Check specifically for brokerage calculation errors
             if (error.message && (
                 error.message.includes("brokerage has already been calculated")
                 || error.message.includes("brokerage calculation first")
                 || error.isBrokerageConflict === true
             )) {
-                // Special styling for brokerage conflict errors
                 toast.error(error.message, {
-                    duration: 10000, // Longer duration for important message
+                    duration: 10000,
                     icon: "🚫",
                     style: {
                         border: "2px solid #f43f5e",
@@ -343,7 +319,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 return;
             }
 
-            // Handle other specific error messages
             if (error.message
                 && !error.message.includes("Request failed with status code")
                 && !error.message.includes("Failed to create trade")) {
@@ -378,11 +353,9 @@ const AddTrade: React.FC<AddTradeProps> = ({
     });
 
     const onSubmit = async (data: TradeFormValues) => {
-        // Prepare the trade date
         const formattedTradeDate = formatDateForTradeApi(new Date(data.tradeDate)) || new Date().toISOString().split("T")[0];
 
         if (isEditMode && editTradeId) {
-            // Handle update
             const updateRequest: UpdateTradeRequest = {
                 id: editTradeId,
                 clientId: data.clientId,
@@ -395,29 +368,25 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 notes: data.notes || "",
             };
 
-            // //console.log("Sending update request:", JSON.stringify(updateRequest, null, 2));
-
             try {
                 const response = await updateTrade(editTradeId, updateRequest);
                 toast.success(response.message || "Trade updated successfully");
                 queryClient.invalidateQueries({ queryKey: ["trades"] });
                 queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
                 tradeForm.reset();
-                setOpen(false); // This will use the controlled setter if available
+                setOpen(false);
                 if (onSuccess)
                     onSuccess();
             } catch (error: any) {
                 console.error("Trade update error:", error);
 
-                // Check specifically for brokerage calculation errors
                 if (error.message && (
                     error.message.includes("brokerage has already been calculated")
                     || error.message.includes("brokerage calculation first")
                     || error.isBrokerageConflict === true
                 )) {
-                    // Special styling for brokerage conflict errors
                     toast.error(error.message, {
-                        duration: 10000, // Longer duration for important message
+                        duration: 10000,
                         icon: "🚫",
                         style: {
                             border: "2px solid #f43f5e",
@@ -429,7 +398,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     return;
                 }
 
-                // Handle other specific error messages
                 if (error.message
                     && !error.message.includes("Request failed with status code")
                     && !error.message.includes("Failed to update trade")) {
@@ -473,8 +441,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 notes: data.notes || "",
             };
 
-            // //console.log("Sending create request:", JSON.stringify(createRequest, null, 2));
-
             createTradeMutation.mutate(createRequest);
         }
     };
@@ -489,32 +455,25 @@ const AddTrade: React.FC<AddTradeProps> = ({
         return 0;
     };
 
-    // Handle invalid data scenario
     useEffect(() => {
-        // Only check if we're showing the dialog
         if (open && !loadingStocks) {
             const hasValidData = stockSymbols
                 && typeof stockSymbols === "object"
                 && (Array.isArray(stockSymbols.nse) || Array.isArray(stockSymbols.bse));
 
             if (!hasValidData) {
-                // If we don't have valid data while the dialog is open, try to refetch
                 queryClient.invalidateQueries({ queryKey: ["stockSymbols"] });
             }
         }
     }, [stockSymbols, loadingStocks, queryClient, open]);
 
-    // Pre-fetch data when dialog opens
     useEffect(() => {
-        // When the dialog opens...
         if (open) {
-            // If we don't have any stock data from any source, trigger the query
             if (formattedStocks.length === 0) {
-                // Prefetch the data
                 queryClient.prefetchQuery({
                     queryKey: ["stockSymbols"],
                     queryFn: getStockSymbols,
-                    staleTime: 5 * 60 * 1000, // 5 minutes
+                    staleTime: 5 * 60 * 1000,
                 });
             }
         }
@@ -522,26 +481,13 @@ const AddTrade: React.FC<AddTradeProps> = ({
 
     const totalValue = calculateTotalValue();
 
-    // print form values changes
-    // useEffect(() => {
-    //     const subscription = tradeForm.watch((value, { name, type }) => {
-    //         //console.log(`Form value changed: ${name} (${type})`, value);
-    //     });
-
-    //     return () => subscription.unsubscribe();
-    // }, [tradeForm]);
-
-    // State to track button loading
     const [isButtonLoading, setIsButtonLoading] = useState(false);
 
-    // Handle dialog open with prefetching
     const handleDialogOpen = (newOpenState: boolean) => {
         if (newOpenState) {
-            // If opening and we don't have data, show loading state
             if (formattedStocks.length === 0) {
                 setIsButtonLoading(true);
 
-                // Prefetch the stock symbols before opening the dialog
                 queryClient.prefetchQuery({
                     queryKey: ["stockSymbols"],
                     queryFn: getStockSymbols,
@@ -551,17 +497,14 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     setOpen(true);
                 }).catch(() => {
                     setIsButtonLoading(false);
-                    setOpen(true); // Open anyway, will show error state inside
+                    setOpen(true);
                 });
             } else {
-                // We already have data, just open
                 setOpen(true);
             }
         } else {
-            // Just close
             setOpen(false);
 
-            // If we're in edit mode, also clear form when closing
             if (isEditMode) {
                 tradeForm.reset();
             }
@@ -570,7 +513,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={handleDialogOpen}>
-            {/* Only show the DialogTrigger for Add mode, not Edit mode */}
             {!isEditMode && (
                 <DialogTrigger asChild>
                     <Button
@@ -651,11 +593,9 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                 value={clientSearchTerm}
                                                                                 onChange={e => setClientSearchTerm(e.target.value)}
                                                                                 onKeyDown={(e) => {
-                                                                                // Allow directly entering client ID by pressing Enter
                                                                                     if (e.key === "Enter" && clientSearchTerm.trim() !== "") {
                                                                                         e.preventDefault();
                                                                                         const clientId = Number.parseInt(clientSearchTerm.trim());
-                                                                                        // Check if it's a valid number
                                                                                         if (!Number.isNaN(clientId) && clientId > 0) {
                                                                                             tradeForm.setValue("clientId", clientId);
                                                                                             setOpenClientPopover(false);
@@ -793,29 +733,22 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                                 )
 
                                                                                             : (field.value
-                                                                                                // Display the selected stock with exchange suffix
 
                                                                                                     ? (() => {
-                                                                                                            // Always use the current exchange value from the form
                                                                                                             const currentExchange = tradeForm.watch("exchange");
 
-                                                                                                            // Check if we have this stock in our pre-formatted list
                                                                                                             const foundStock = formattedStocks.find(stock =>
                                                                                                                 stock.value === field.value && stock.exchange === currentExchange,
                                                                                                             );
 
-                                                                                                            // If found in the list with matching exchange, return its label
                                                                                                             if (foundStock) {
                                                                                                                 return foundStock.label;
                                                                                                             }
 
-                                                                                                            // Otherwise, build the label from current form values
-                                                                                                            // This ensures the displayed exchange always matches what's selected
                                                                                                             if (field.value && currentExchange) {
                                                                                                                 return `${field.value}-${currentExchange}`;
                                                                                                             }
 
-                                                                                                            // If we don't have the exchange but have the value, just show the symbol
                                                                                                             return field.value
                                                                                                                 ? field.value
                                                                                                                 : "Select stock symbol";
@@ -847,12 +780,10 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                 value={searchTerm}
                                                                                 onChange={e => setSearchTerm(e.target.value)}
                                                                                 onKeyDown={(e) => {
-                                                                                // Allow directly entering stock symbol by pressing Enter
                                                                                     if (e.key === "Enter" && searchTerm.trim() !== "") {
                                                                                         e.preventDefault();
                                                                                         const cleanSymbol = searchTerm.trim().replace(/-NSE|-BSE/i, "");
 
-                                                                                        // Determine the exchange more accurately - look for BSE indicators
                                                                                         const hasBseIndicator
                                                                                         = searchTerm.toUpperCase().includes("-BSE")
                                                                                             || searchTerm.toUpperCase().endsWith("BSE")
@@ -863,9 +794,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                             ? "BSE" as const
                                                                                             : "NSE" as const;
 
-                                                                                        // //console.log(`Setting symbol: ${cleanSymbol}, exchange: ${exchange} from keyboard`);
-
-                                                                                        // Set values in form - set exchange first for consistent UI updates
                                                                                         tradeForm.setValue("exchange", exchange);
                                                                                         tradeForm.setValue("symbol", cleanSymbol);
 
@@ -874,7 +802,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                 }}
                                                                             />
 
-                                                                            {/* "Use as symbol" button section has been removed */}
                                                                             {stockError && (
                                                                                 <Card className="border border-red-200 mb-2">
                                                                                     <CardContent className="p-2">

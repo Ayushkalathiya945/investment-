@@ -77,17 +77,13 @@ const RangeDatePicker: React.FC<RangeDatePickerProps> = ({ from, to, onChange })
     // Use ref to track internal updates vs. prop changes
     const isInternalUpdate = React.useRef(false);
     const onClear = () => {
-        // Mark as internal update since user is clearing
         isInternalUpdate.current = true;
 
-        // Update internal state
-        setDate({
-            from: undefined,
-            to: undefined,
-        });
+        setDate(undefined);
 
-        // Clear the form
-        form.setValue("dateRange", { from: undefined, to: undefined });
+        form.setValue("dateRange", undefined);
+
+        onChange({ from: undefined, to: undefined });
     };
 
     // Update form value when date changes internally (from the calendar)
@@ -142,7 +138,7 @@ const RangeDatePicker: React.FC<RangeDatePickerProps> = ({ from, to, onChange })
                                             )}
                                         >
                                             <span className="text-xs">
-                                                {field.value?.from instanceof Date
+                                                {field.value && field.value.from instanceof Date
                                                     ? (
                                                             field.value.to instanceof Date
                                                                 ? (
@@ -175,7 +171,7 @@ const RangeDatePicker: React.FC<RangeDatePickerProps> = ({ from, to, onChange })
                                         initialFocus
                                         mode="range"
                                         defaultMonth={date?.from}
-                                        selected={date}
+                                        selected={date || undefined}
                                         onSelect={(newDate) => {
                                             // Mark that this change is coming from user interaction
                                             isInternalUpdate.current = true;

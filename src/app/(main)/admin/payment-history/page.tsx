@@ -126,7 +126,7 @@ const PaymentHistory: React.FC = () => {
             try {
                 const clientFilterParams: ClientFilterRequest = {
                     page: 1,
-                    limit: 100, // Get all clients
+                    limit: 100,
                 };
 
                 const response = await getAllClients(clientFilterParams);
@@ -147,11 +147,10 @@ const PaymentHistory: React.FC = () => {
 
         fetchClients();
     }, []);
-    // Process dates ahead of time to ensure they're valid
+
     const fromDateFormatted = dateRange?.from ? formatDateForPaymentApi(dateRange.from) : undefined;
     const toDateFormatted = dateRange?.to ? formatDateForPaymentApi(dateRange.to) : undefined;
 
-    // Prepare filter params for API calls
     const filterParams: PaymentFilterRequest = {
         page: currentPage,
         limit: PAGE_LIMIT,
@@ -160,53 +159,43 @@ const PaymentHistory: React.FC = () => {
         to: toDateFormatted,
     };
 
-    // Fetch payments data
     const {
         data: paymentsResponse,
         isLoading,
         error,
-        refetch,
     } = useQuery({
         queryKey: ["payments", filterParams],
         queryFn: () => getAllPayments(filterParams),
         refetchOnWindowFocus: false,
     });
 
-    // Handle errors
     useEffect(() => {
         if (error) {
             toast.error(`Failed to load payments: ${(error as Error).message}`);
         }
     }, [error]);
 
-    // Use a ref to track if we're actively handling date changes
     const isHandlingDateChange = React.useRef(false);
 
     const handleDateChange = (date: DateRange) => {
-        // Prevent processing if we're already handling a date change
         if (isHandlingDateChange.current)
             return;
 
-        // Set flag that we're handling a date change
         isHandlingDateChange.current = true;
 
         try {
-            // Case 1: Both dates are provided
             if (date?.from && date?.to) {
-                // Create new Date objects to avoid mutating the original date objects
                 const startDate = new Date(date.from);
                 startDate.setHours(0, 0, 0, 0);
 
                 const endDate = new Date(date.to);
                 endDate.setHours(23, 59, 59, 999);
 
-                // Validate dates are good
                 if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
                     console.error("Invalid date received:", { date, startDate, endDate });
                     return;
                 }
 
-                // Check that formatting works
                 const formattedStart = formatDateForPaymentApi(startDate);
                 const formattedEnd = formatDateForPaymentApi(endDate);
 
@@ -215,24 +204,14 @@ const PaymentHistory: React.FC = () => {
                     return;
                 }
 
-                // //console.log("Setting date range:", {
-                //     from: startDate.toISOString(),
-                //     to: endDate.toISOString(),
-                //     formattedFrom: formattedStart,
-                //     formattedTo: formattedEnd,
-                // });
-
-                // Update state with the new range
                 setDateRange({ from: startDate, to: endDate });
             } else {
                 console.error("Clearing date range");
                 setDateRange(undefined);
             }
 
-            // Reset to first page when date filter changes
             setCurrentPage(1);
         } finally {
-            // Clear the flag
             setTimeout(() => {
                 isHandlingDateChange.current = false;
             }, 100);
@@ -241,21 +220,13 @@ const PaymentHistory: React.FC = () => {
 
     const handleClientChange = (clientId: string) => {
         setSelectedClientId(clientId === "all" ? undefined : Number.parseInt(clientId));
-        setCurrentPage(1); // Reset to first page
+        setCurrentPage(1);
     };
 
-    // Handle payment added successfully
-    const handlePaymentAdded = () => {
-        toast.success("Payment has been added successfully");
-        refetch(); // Refresh the payments list
-    };
-
-    // Get total pages from API response
     const totalPages = paymentsResponse?.pagination?.total
         ? Math.ceil(paymentsResponse.pagination.total / PAGE_LIMIT)
         : 1;
 
-    // Payment data from API or empty array if not available
     const payments = paymentsResponse?.data || [];
 
     // Format date for display
@@ -305,8 +276,7 @@ const PaymentHistory: React.FC = () => {
                     </div>
                     <AddPayment
                         name="Add Payment"
-                        clientId={selectedClientId} // Only pass clientId if it's actually selected
-                        onSuccess={handlePaymentAdded}
+                        clientId={selectedClientId}
                     />
                 </div>
             </div>

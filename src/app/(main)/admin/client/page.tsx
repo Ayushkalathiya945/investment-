@@ -18,11 +18,17 @@ import RangeDatePicker from "@/components/ui/rangeDatePicker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PAGE_LIMIT } from "@/lib/constants";
 
-// Helper function to format date as YYYY-MM-DD
+// Helper function to format date as YYYY-MM-DD in local timezone
 function formatDateToYYYYMMDD(date: Date | undefined): string | undefined {
     if (!date)
         return undefined;
-    return date.toISOString().split("T")[0]; // Gets YYYY-MM-DD part only
+
+    // Format date in local timezone to avoid UTC conversion issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
 }
 
 const Client: React.FC = () => {
@@ -139,7 +145,7 @@ const Client: React.FC = () => {
     }, [clientsData]);
 
     // Fetch analytics data
-    const { data: analyticsResponse, error: analyticsError } = useQuery({
+    const { data: analyticsResponse, isLoading: isLoadingAnalytics, error: analyticsError } = useQuery({
         queryKey: ["clientAnalytics", filterParams],
         queryFn: () => getClientAnalytics(filterParams),
         refetchOnWindowFocus: false,
@@ -163,13 +169,29 @@ const Client: React.FC = () => {
     }, [clientsError, analyticsError]);
 
     const handleDateChange = (date: DateRange) => {
+        console.log("handleDateChange received:", date);
+
         if (date?.from && date?.to) {
-            const startDate = new Date(date.from.setHours(0, 0, 0, 0));
-            const endDate = new Date(date.to.setHours(23, 59, 59, 999));
+            // Create new Date objects to avoid mutating the original dates
+            const startDate = new Date(date.from);
+            startDate.setHours(0, 0, 0, 0);
+
+            // Set time components without modifying the date part
+            const endDate = new Date(date.to);
+            endDate.setHours(23, 59, 59, 999);
+
+            console.log("Setting date range:", {
+                from: startDate.toDateString(),
+                to: endDate.toDateString(),
+            });
+
             setDateRange({ from: startDate, to: endDate });
         } else {
+            // Clear date range completely when either date is undefined
+            console.log("Clearing date range");
             setDateRange(undefined);
         }
+
         // Reset to first page when date filter changes
         setCurrentPage(1);
     };
@@ -197,8 +219,8 @@ const Client: React.FC = () => {
                 <div className="flex gap-4 items-center">
                     <div className="md:w-1/2 w-full">
                         <RangeDatePicker
-                            from={dateRange?.from?.toISOString()}
-                            to={dateRange?.to?.toISOString()}
+                            from={dateRange?.from ? new Date(dateRange.from).toISOString() : undefined}
+                            to={dateRange?.to ? new Date(dateRange.to).toISOString() : undefined}
                             onChange={handleDateChange}
                         />
                     </div>
@@ -206,21 +228,29 @@ const Client: React.FC = () => {
                 </div>
             </div>
             <div className="grid xl:grid-cols-4 md:grid-cols-2 grid-cols-1 justify-between gap-3 px-2">
-                <StatCard icon={<Users />} value={analytics.totalClient} label="Total Clients" />
+                <StatCard
+                    icon={<Users />}
+                    value={analytics.totalClient}
+                    label="Total Clients"
+                    isLoading={isLoadingAnalytics}
+                />
                 <StatCard
                     icon={<IndianRupee />}
                     value={typeof analytics.totalTradeAmount === "number" ? `₹${analytics.totalTradeAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Total Value"
+                    isLoading={isLoadingAnalytics}
                 />
                 <StatCard
                     icon={<TrendingUp />}
                     value={typeof analytics.totalBrokerageAmount === "number" ? `₹${analytics.totalBrokerageAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Total fees"
+                    isLoading={isLoadingAnalytics}
                 />
                 <StatCard
                     icon={<TrendingDown />}
                     value={typeof analytics.totalPaymentAmount === "number" ? `₹${analytics.totalPaymentAmount.toLocaleString("en-IN")}` : "₹0"}
                     label="Payments Received"
+                    isLoading={isLoadingAnalytics}
                 />
             </div>
             <div className="relative w-full">

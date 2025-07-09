@@ -112,10 +112,14 @@ export async function getClientAnalytics(data: ClientFilterRequest): Promise<Cli
                 return dateString;
             }
 
-            // Otherwise try to convert to YYYY-MM-DD
+            // Otherwise try to convert to YYYY-MM-DD in local timezone
             try {
                 const date = new Date(dateString);
-                return date.toISOString().split("T")[0];
+                // Format in local timezone to avoid UTC conversion issues
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, "0");
+                const day = String(date.getDate()).padStart(2, "0");
+                return `${year}-${month}-${day}`;
             } catch (e) {
                 console.error("Invalid date format:", dateString);
                 console.error("Error  : ", e);

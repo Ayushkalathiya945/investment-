@@ -544,6 +544,7 @@ const Brokerage: React.FC = () => {
                         maximumFractionDigits: 0,
                     }).format(totalBrokerageAmount)}
                     label="Total Fees"
+                    isLoading={isLoading}
                 />
             </div>
 

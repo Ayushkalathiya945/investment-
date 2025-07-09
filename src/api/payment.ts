@@ -78,7 +78,7 @@ export function formatDateForPaymentApi(date: Date | undefined): string | undefi
         const day = String(date.getDate()).padStart(2, "0");
 
         const formattedDate = `${year}-${month}-${day}`;
-        console.error(`Formatted date from ${date.toISOString()} to ${formattedDate}`);
+        // console.error(`Formatted date from ${date.toISOString()} to ${formattedDate}`);
         return formattedDate;
     } catch (error) {
         console.error("Failed to format date:", error, date);

@@ -51,28 +51,15 @@ export function calculateProRatedBrokerage(
     return (fullMonthBrokerage * daysHeld) / totalDaysInMonth;
 }
 
-/**
- * Super-optimized version that calculates and saves brokerage for all clients
- * - Uses dedicated query functions
- * - Reduces database interactions
- * - Minimal logging
- * - Batch operations
- */
 export async function calculateAndSaveMonthlyBrokerageOptimized(
     month: number,
     year: number,
     tx?: TransactionType,
 ): Promise<void> {
-    // Minimal logging - just the start
     console.log(`🔍 Calculating brokerage for ${month}/${year}`);
 
-    // Validate input parameters
     if (month < 1 || month > 12) {
         throw new Error(`Invalid month: ${month}. Must be between 1 and 12.`);
-    }
-
-    if (year < 2000 || year > 2100) {
-        throw new Error(`Invalid year: ${year}. Must be between 2000 and 2100.`);
     }
 
     // Create period identifier in YYYYMM format
@@ -256,13 +243,15 @@ async function calculateFifoBrokerageOptimized(
             // Skip if bought on the last day of the month (same day trades)
             const isSameDay = new Date(holdingStartDate).toDateString() === new Date(endOfMonth).toDateString();
 
-            // If bought on the same day as the end of month review, no brokerage
+            // If bought on the same day as the end of month review, use 1 day minimum
             if (isSameDay) {
-                holdingDays = 0;
+                holdingDays = 1; // Minimum 1 day for brokerage calculation
             } else if (holdingStartDate >= startOfMonth) { // If bought during this month, adjust days held
                 holdingDays = Math.floor((endOfMonth - holdingStartDate) / (1000 * 60 * 60 * 24)) + 1;
                 if (holdingDays > daysInMonth)
                     holdingDays = daysInMonth;
+                if (holdingDays < 1)
+                    holdingDays = 1; // Ensure minimum 1 day
             } else {
                 // If bought before this month, use start of month
                 holdingStartDate = startOfMonth;
@@ -270,10 +259,9 @@ async function calculateFifoBrokerageOptimized(
 
             // Calculate brokerage
             const positionValue = trade.remainingQuantity * currentPrice;
-            // Only apply brokerage if holding days > 0 (not a same-day trade)
-            const tradeBrokerage = holdingDays > 0
-                ? calculateProRatedBrokerage(positionValue, holdingDays, daysInMonth)
-                : 0;
+            // If holding days are 0, calculate brokerage for 1 day instead
+            const effectiveHoldingDays = holdingDays === 0 ? 1 : holdingDays;
+            const tradeBrokerage = calculateProRatedBrokerage(positionValue, effectiveHoldingDays, daysInMonth);
 
             // Update totals
             totalBrokerage += tradeBrokerage;
@@ -281,7 +269,7 @@ async function calculateFifoBrokerageOptimized(
             totalHoldingDays += holdingDays;
 
             // Create calculation formula for transparency
-            const calculationFormula = `₹${positionValue.toFixed(2)} × 10% × ${holdingDays}/${daysInMonth} days = ₹${tradeBrokerage.toFixed(2)}`;
+            const calculationFormula = `₹${positionValue.toFixed(2)} × ${env.BROKERAGE_RATE}% × ${holdingDays}/${daysInMonth} days = ₹${tradeBrokerage.toFixed(2)}`;
 
             // Return the details object for this trade
             return {
@@ -314,11 +302,6 @@ async function calculateFifoBrokerageOptimized(
 
     // Process allocations in parallel but collect results before updating database
     const fifoAllocResults = await Promise.all(fifoSellingAllocations.map(async (allocation: FifoAllocation) => {
-        // Skip if sold on same day as bought (no brokerage)
-        if (allocation.buyDate === allocation.sellDate) {
-            return null;
-        }
-
         // Determine the holding period within this month
         let holdingStartDate = allocation.buyDate;
         const holdingEndDate = allocation.sellDate;
@@ -329,47 +312,50 @@ async function calculateFifoBrokerageOptimized(
         }
 
         // Calculate days using Math.floor to avoid extra day
-        const holdingDays = Math.floor((holdingEndDate - holdingStartDate) / (1000 * 60 * 60 * 24)) + 1;
+        let holdingDays = Math.floor((holdingEndDate - holdingStartDate) / (1000 * 60 * 60 * 24)) + 1;
 
-        // Calculate brokerage only if holding days > 0
-        if (holdingDays > 0) {
-            const positionValue = allocation.buyValue;
-            const allocBrokerage = calculateProRatedBrokerage(positionValue, holdingDays, daysInMonth);
+        // Ensure minimum of 1 day for brokerage calculation, even for same-day trades
+        if (holdingDays <= 0) {
+            holdingDays = 1;
+        }
 
-            // Get the buy trade for this allocation - use the query function
-            const buyTrade = await tradeQueries.getTradeById(allocation.buyTradeId, tx);
-            if (buyTrade) {
-                const now = Date.now();
-                const safeBuyDate = typeof allocation.buyDate === "number" ? allocation.buyDate : now;
-                const safeHoldingStartDate = typeof holdingStartDate === "number" ? holdingStartDate : now;
-                const safeHoldingEndDate = typeof holdingEndDate === "number" ? holdingEndDate : now;
-                const safeSellDate = typeof allocation.sellDate === "number" ? allocation.sellDate : now;
+        // Always calculate brokerage (minimum 1 day)
+        const positionValue = allocation.buyValue;
+        const allocBrokerage = calculateProRatedBrokerage(positionValue, holdingDays, daysInMonth);
 
-                return {
-                    detail: {
-                        tradeId: buyTrade.id,
-                        symbol: allocation.symbol,
-                        exchange: allocation.exchange as ExchangeType,
-                        quantity: allocation.quantityAllocated,
-                        buyPrice: allocation.buyPrice,
-                        buyDate: safeBuyDate,
-                        holdingStartDate: safeHoldingStartDate,
-                        holdingEndDate: safeHoldingEndDate,
-                        holdingDays,
-                        totalDaysInMonth: daysInMonth,
-                        positionValue,
-                        brokerageAmount: allocBrokerage,
-                        calculationFormula: `₹${positionValue.toFixed(2)} × 10% × ${holdingDays}/${daysInMonth} days = ₹${allocBrokerage.toFixed(2)}`,
-                        isSoldInMonth: 1,
-                        sellDate: safeSellDate,
-                        sellPrice: allocation.sellPrice,
-                        sellValue: allocation.sellValue,
-                    },
-                    brokerage: allocBrokerage,
-                    value: positionValue,
-                    days: holdingDays,
-                };
-            }
+        // Get the buy trade for this allocation - use the query function
+        const buyTrade = await tradeQueries.getTradeById(allocation.buyTradeId, tx);
+        if (buyTrade) {
+            const now = Date.now();
+            const safeBuyDate = typeof allocation.buyDate === "number" ? allocation.buyDate : now;
+            const safeHoldingStartDate = typeof holdingStartDate === "number" ? holdingStartDate : now;
+            const safeHoldingEndDate = typeof holdingEndDate === "number" ? holdingEndDate : now;
+            const safeSellDate = typeof allocation.sellDate === "number" ? allocation.sellDate : now;
+
+            return {
+                detail: {
+                    tradeId: buyTrade.id,
+                    symbol: allocation.symbol,
+                    exchange: allocation.exchange as ExchangeType,
+                    quantity: allocation.quantityAllocated,
+                    buyPrice: allocation.buyPrice,
+                    buyDate: safeBuyDate,
+                    holdingStartDate: safeHoldingStartDate,
+                    holdingEndDate: safeHoldingEndDate,
+                    holdingDays,
+                    totalDaysInMonth: daysInMonth,
+                    positionValue,
+                    brokerageAmount: allocBrokerage,
+                    calculationFormula: `₹${positionValue.toFixed(2)} × ${env.BROKERAGE_RATE}% × ${holdingDays}/${daysInMonth} days = ₹${allocBrokerage.toFixed(2)}`,
+                    isSoldInMonth: 1,
+                    sellDate: safeSellDate,
+                    sellPrice: allocation.sellPrice,
+                    sellValue: allocation.sellValue,
+                },
+                brokerage: allocBrokerage,
+                value: positionValue,
+                days: holdingDays,
+            };
         }
         return null;
     }));
@@ -405,9 +391,6 @@ async function calculateFifoBrokerageOptimized(
     };
 }
 
-/**
- * Super-optimized trade stats with query functions and minimal logging
- */
 async function getMonthlyTradeStatsOptimized(
     clientId: number,
     startOfMonth: number,
@@ -417,7 +400,7 @@ async function getMonthlyTradeStatsOptimized(
         totalTrades: number;
         totalTurnover: number;
     }> {
-    // Use the query function to get trades within the date range
+    // get trades -> date range
     const monthlyTrades = await tradeQueries.getTradesByDateRange(
         clientId,
         startOfMonth,

@@ -1,5 +1,6 @@
 import React from "react";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 type StatCardProps = {
@@ -7,9 +8,10 @@ type StatCardProps = {
     value: number | string;
     label: string;
     className?: string;
+    isLoading?: boolean;
 };
 
-const StatCard: React.FC<StatCardProps> = ({ icon, value, label, className }) => {
+const StatCard: React.FC<StatCardProps> = ({ icon, value, label, className, isLoading = false }) => {
     return (
         <div
             className={cn(
@@ -21,9 +23,25 @@ const StatCard: React.FC<StatCardProps> = ({ icon, value, label, className }) =>
                 <div className="flex items-center shrink-0 justify-center bg-secondary text-sm p-4 group-hover:bg-white text-primary rounded-full w-13 h-13">
                     {icon}
                 </div>
-                <p className="w-full text-2xl text-start leading-loose group-hover:text-primary font-semibold">{value}</p>
+                {isLoading
+                    ? (
+                            <div className="w-full">
+                                <Skeleton className="h-8 w-3/4" />
+                            </div>
+                        )
+                    : (
+                            <p className="w-full text-2xl text-start leading-loose group-hover:text-primary font-semibold">{value}</p>
+                        )}
             </div>
-            <p className="w-full text-end text-sm font-medium text-black">{label}</p>
+            {isLoading
+                ? (
+                        <div className="w-full flex justify-end">
+                            <Skeleton className="h-4 w-1/3" />
+                        </div>
+                    )
+                : (
+                        <p className="w-full text-end text-sm font-medium text-black">{label}</p>
+                    )}
         </div>
     );
 };
