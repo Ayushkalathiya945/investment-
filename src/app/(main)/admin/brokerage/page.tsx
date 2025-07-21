@@ -1,392 +1,351 @@
 "use client";
 
-import { format } from "date-fns";
+import { addMonths, endOfMonth, format, startOfMonth } from "date-fns";
 import { TrendingUp } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 
-import type { BrokerageItem } from "@/types/brokerage";
+import type {
+    DailyBrokerageRecord,
+    MonthlyBrokerageSummary,
+    QuarterlyBrokerageSummary,
+} from "@/types/brokerage";
 
-import { getAllPeriodicBrokerage, getBrokerageRecords } from "@/api/brokerage";
-import { getAllClientsForDropdown } from "@/api/client";
+import { getPeriodicBrokerage } from "@/api/brokerage";
 import StatCard from "@/components/StatCard";
 import MonthRangePicker from "@/components/ui/monthRangePicker";
 import { Pagination } from "@/components/ui/pagination";
+import RangeDatePicker from "@/components/ui/rangeDatePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PAGE_LIMIT } from "@/lib/constants";
-import { PeriodType } from "@/types/brokerage";
+import { PeriodType as ApiPeriodType } from "@/types/brokerage";
 
-function formatDateString(date: Date): string {
+function _formatDateString(date: Date): string {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function getQuarterFromDate(date: Date): number {
+// PeriodType enum for UI only
+const PeriodType = {
+    DAILY: "DAILY",
+    MONTHLY: "MONTHLY",
+    QUARTERLY: "QUARTERLY",
+} as const;
+type PeriodType = keyof typeof PeriodType;
+
+function _getQuarterFromDate(date: Date): number {
     return Math.floor(date.getMonth() / 3) + 1;
 }
-
-function parseDateFromString(dateString: string | null): Date | undefined {
-    if (!dateString)
-        return undefined;
-    try {
-        const date = new Date(dateString);
-
-        if (Number.isNaN(date.getTime())) {
-            return undefined;
-        }
-
-        if (dateString.includes("T")) {
-            return date;
-        }
-
-        if (dateString.includes("-")) {
-            const [yearStr, monthStr, dayStr] = dateString.split("-");
-            const year = Number.parseInt(yearStr);
-            const month = Number.parseInt(monthStr) - 1;
-            const day = Number.parseInt(dayStr);
-            return new Date(year, month, day);
-        }
-
-        return date;
-    } catch {
-        return undefined;
-    }
-}
-
-function getQuarterName(quarter: number): string {
-    return `Q${quarter}`;
-}
-
 function getQuarters(): number[] {
     return [1, 2, 3, 4];
 }
-
 function getAvailableYears(): number[] {
     const currentYear = new Date().getFullYear();
     return [currentYear - 3, currentYear - 2, currentYear - 1, currentYear];
 }
-
-type MonthRange = {
-    from?: Date;
-    to?: Date;
-};
+function getQuarterName(quarter: number): string {
+    return `Q${quarter}`;
+}
 
 const Brokerage: React.FC = () => {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    const initialPage = Number.parseInt(searchParams.get("page") || "1");
-    const initialClientId = searchParams.get("clientId") ? Number.parseInt(searchParams.get("clientId")!) : undefined;
-    const initialPeriodType = searchParams.get("periodType") as PeriodType || PeriodType.MONTH;
-
-    const parsedFrom = parseDateFromString(searchParams.get("from"));
-    const parsedTo = parseDateFromString(searchParams.get("to"));
-    const initialDateRange: MonthRange = (parsedFrom && parsedTo)
-        ? {
-                from: parsedFrom,
-                to: parsedTo,
-            }
-        : {};
-
-    // Initialize quarter and year from URL params or default to current
-    const initialQuarter = searchParams.get("quarter")
-        ? Number.parseInt(searchParams.get("quarter")!)
-        : initialDateRange.from
-            ? getQuarterFromDate(initialDateRange.from)
-            : getQuarterFromDate(new Date());
-
-    const initialYear = searchParams.get("year")
-        ? Number.parseInt(searchParams.get("year")!)
-        : initialDateRange.from
-            ? initialDateRange.from.getFullYear()
-            : new Date().getFullYear();
-
-    const [currentPage, setCurrentPage] = useState(initialPage);
-    const [dateRange, setDateRange] = useState<MonthRange>(initialDateRange);
-    const [brokerageData, setBrokerageData] = useState<BrokerageItem[]>([]);
-    const [periodType, setPeriodType] = useState<PeriodType>(initialPeriodType);
-    const [totalBrokerageAmount, setTotalBrokerageAmount] = useState<number>(0);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [selectedClientId, setSelectedClientId] = useState<number | undefined>(initialClientId);
-    const [selectedQuarter, setSelectedQuarter] = useState<number>(initialQuarter);
-    const [selectedYear, setSelectedYear] = useState<number>(initialYear);
-    const [clients, setClients] = useState<Array<{ id: number; name: string }>>([]);
-    const [serverPaginationData, setServerPaginationData] = useState<{
-        totalPages: number;
-    }>({ totalPages: 1 });
-
-    const updateURLParams = useCallback((params: { [key: string]: string | null }) => {
+    // Helper function to update URL with current filter state
+    const updateURL = useCallback((params: Record<string, string | number | undefined>) => {
         const newSearchParams = new URLSearchParams(searchParams.toString());
 
+        // Clear all existing filter params first
+        const filterKeys = ["periodType", "page", "selectedMonthYear", "monthFrom", "monthTo", "selectedQuarter", "selectedQuarterYear", "dateFrom", "dateTo"];
+        filterKeys.forEach(key => newSearchParams.delete(key));
+
+        // Add new params
         Object.entries(params).forEach(([key, value]) => {
-            if (value === null) {
-                newSearchParams.delete(key);
-            } else {
-                newSearchParams.set(key, value);
+            if (value !== undefined && value !== null && value !== "") {
+                newSearchParams.set(key, value.toString());
             }
         });
 
-        const search = newSearchParams.toString();
-        const query = search ? `?${search}` : "";
-        router.replace(`${pathname}${query}`, { scroll: false });
-    }, [pathname, router, searchParams]);
+        router.push(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+    }, [searchParams, router, pathname]);
 
-    useEffect(() => {
-        const fromParam = searchParams.get("from");
-        const toParam = searchParams.get("to");
+    // Initialize state from URL parameters
+    const initializeFromURL = useCallback(() => {
+        const urlPeriodType = searchParams.get("periodType") as PeriodType || "MONTHLY";
+        const urlPage = Number.parseInt(searchParams.get("page") || "1");
+        const urlSelectedMonthYear = Number.parseInt(searchParams.get("selectedMonthYear") || new Date().getFullYear().toString());
+        const urlSelectedQuarter = Number.parseInt(searchParams.get("selectedQuarter") || "1");
+        const urlSelectedQuarterYear = Number.parseInt(searchParams.get("selectedQuarterYear") || new Date().getFullYear().toString());
 
-        if (fromParam && toParam) {
-            const fromDate = parseDateFromString(fromParam);
-            const toDate = parseDateFromString(toParam);
+        return {
+            periodType: urlPeriodType,
+            page: urlPage,
+            selectedMonthYear: urlSelectedMonthYear,
+            selectedQuarter: urlSelectedQuarter,
+            selectedQuarterYear: urlSelectedQuarterYear,
+            monthFrom: searchParams.get("monthFrom"),
+            monthTo: searchParams.get("monthTo"),
+            dateFrom: searchParams.get("dateFrom"),
+            dateTo: searchParams.get("dateTo"),
+        };
+    }, [searchParams]);
 
-            if (fromDate && toDate) {
-                setDateRange({ from: fromDate, to: toDate });
-            }
+    // UI state initialized from URL
+    const [periodType, setPeriodType] = useState<PeriodType>(() => {
+        const urlParams = initializeFromURL();
+        return urlParams.periodType;
+    });
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(() => {
+        const urlParams = initializeFromURL();
+        return urlParams.page;
+    });
+    const [totalPages, setTotalPages] = useState(1);
+
+    // Daily (date range)
+    const [selectedDateRange, setSelectedDateRange] = useState<{ from?: Date; to?: Date }>(() => {
+        const urlParams = initializeFromURL();
+        return {
+            from: urlParams.dateFrom ? new Date(urlParams.dateFrom) : startOfMonth(new Date()),
+            to: urlParams.dateTo ? new Date(urlParams.dateTo) : new Date(),
+        };
+    });
+    // Monthly
+    const [monthRange, setMonthRange] = useState<{ from: Date; to: Date }>(() => {
+        const urlParams = initializeFromURL();
+        if (urlParams.monthFrom && urlParams.monthTo) {
+            return {
+                from: new Date(urlParams.monthFrom),
+                to: new Date(urlParams.monthTo),
+            };
         }
+        const now = new Date();
+        return {
+            from: startOfMonth(new Date(now.getFullYear(), 0, 1)),
+            to: endOfMonth(addMonths(new Date(now.getFullYear(), 0, 1), now.getMonth() - 1)),
+        };
+    });
+    const [selectedMonthYear, setSelectedMonthYear] = useState<number>(() => {
+        const urlParams = initializeFromURL();
+        return urlParams.selectedMonthYear;
+    });
+    // Quarterly
+    const [selectedQuarter, setSelectedQuarter] = useState<number>(() => {
+        const urlParams = initializeFromURL();
+        return urlParams.selectedQuarter;
+    });
+    const [selectedQuarterYear, setSelectedQuarterYear] = useState<number>(() => {
+        const urlParams = initializeFromURL();
+        return urlParams.selectedQuarterYear;
+    });
 
-        const quarterParam = searchParams.get("quarter");
-        const yearParam = searchParams.get("year");
+    const [brokerageData, setBrokerageData] = useState<(DailyBrokerageRecord | MonthlyBrokerageSummary | QuarterlyBrokerageSummary)[]>([]);
+    const [totalBrokerageAmount, setTotalBrokerageAmount] = useState<number>(0);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [_serverPaginationData, _setServerPaginationData] = useState<{ totalPages: number; total: number }>({ totalPages: 1, total: 0 });
 
-        if (quarterParam) {
-            setSelectedQuarter(Number.parseInt(quarterParam));
-        }
-
-        if (yearParam) {
-            setSelectedYear(Number.parseInt(yearParam));
-        }
-
-        const periodTypeParam = searchParams.get("periodType");
-        if (periodTypeParam && (periodTypeParam === PeriodType.MONTH || periodTypeParam === PeriodType.QUARTER)) {
-            setPeriodType(periodTypeParam);
-        }
-    }, []);
-
-    useEffect(() => {
-        const fetchClients = async () => {
-            try {
-                const clientsData = await getAllClientsForDropdown();
-                setClients(clientsData);
-            } catch (error) {
-                console.error("Error fetching clients:", error);
-                toast.error("Failed to load client list");
-            }
+    // Sync current state to URL
+    const syncStateToURL = useCallback(() => {
+        const params: Record<string, string | number | undefined> = {
+            periodType,
+            page: currentPage,
         };
 
-        fetchClients();
-    }, []);
+        // Add period-specific parameters
+        switch (periodType) {
+            case "DAILY":
+                if (selectedDateRange.from)
+                    params.dateFrom = selectedDateRange.from.toISOString().split("T")[0];
+                if (selectedDateRange.to)
+                    params.dateTo = selectedDateRange.to.toISOString().split("T")[0];
+                break;
+            case "MONTHLY":
+                params.selectedMonthYear = selectedMonthYear;
+                params.monthFrom = monthRange.from.toISOString().split("T")[0];
+                params.monthTo = monthRange.to.toISOString().split("T")[0];
+                break;
+            case "QUARTERLY":
+                params.selectedQuarter = selectedQuarter;
+                params.selectedQuarterYear = selectedQuarterYear;
+                break;
+        }
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setIsLoading(true);
-                let response;
+        updateURL(params);
+    }, [periodType, currentPage, selectedDateRange, selectedMonthYear, monthRange, selectedQuarter, selectedQuarterYear, updateURL]);
 
-                if (selectedClientId) {
-                    const filterParams = {
-                        page: currentPage,
-                        limit: PAGE_LIMIT,
-                        clientId: selectedClientId,
-                        year: selectedYear || new Date().getFullYear(),
+    // Fetch data based on period type and filters
+    const fetchBrokerageData = useCallback(async () => {
+        setIsLoading(true);
 
-                        ...(dateRange.from && dateRange.to && {
-                            from: formatDateString(dateRange.from),
-                            to: formatDateString(dateRange.to),
-                        }),
-                        // Include period-specific parameters
-                        ...(periodType === PeriodType.QUARTER && {
-                            quarter: selectedQuarter || getQuarterFromDate(new Date()),
-                        }),
-                        // For monthly period type, use date range month if available
-                        ...(periodType === PeriodType.MONTH && {
-                            month: dateRange.from ? dateRange.from.getMonth() + 1 : new Date().getMonth() + 1,
-                        }),
-                    };
+        // Sync state to URL before fetching
+        syncStateToURL();
+        try {
+            let apiPeriodType: ApiPeriodType;
+            let period: number | undefined;
+            let year: number | undefined;
 
-                    response = await getBrokerageRecords(filterParams);
-                } else {
-                    if (periodType === PeriodType.QUARTER) {
-                        response = await getAllPeriodicBrokerage(
-                            periodType,
-                            selectedQuarter,
-                            selectedYear,
-                            currentPage,
-                            PAGE_LIMIT,
-                        );
-                    } else if (periodType === PeriodType.MONTH) {
-                        if (dateRange.from && dateRange.to) {
-                            const filterParams = {
-                                page: currentPage,
-                                limit: PAGE_LIMIT,
-                                periodType: PeriodType.MONTH,
-                                from: formatDateString(dateRange.from),
-                                to: formatDateString(dateRange.to),
-                            };
+            // Map UI period type to API period type and set appropriate filters
+            switch (periodType) {
+                case "DAILY":
+                    apiPeriodType = ApiPeriodType.DAILY;
+                    // For daily, we'll use the date range
+                    break;
+                case "MONTHLY":
+                    apiPeriodType = ApiPeriodType.MONTHLY;
+                    year = selectedMonthYear;
+                    break;
+                case "QUARTERLY":
+                    apiPeriodType = ApiPeriodType.QUARTERLY;
+                    period = selectedQuarter;
+                    year = selectedQuarterYear;
+                    break;
+                default:
+                    apiPeriodType = ApiPeriodType.MONTHLY;
+            }
 
-                            response = await getBrokerageRecords(filterParams);
-                        } else if (searchParams.get("from") && searchParams.get("to") && Object.keys(dateRange).length > 0) {
-                            const fromParam = searchParams.get("from");
-                            const toParam = searchParams.get("to");
+            // Log filter data for debugging
+            // console.log("API Call Parameters:", {
+            //     periodType: apiPeriodType,
+            //     period,
+            //     year,
+            //     currentPage,
+            //     limit: PAGE_LIMIT,
+            //     uiPeriodType: periodType,
+            //     selectedDateRange: periodType === "DAILY" ? selectedDateRange : null,
+            //     selectedMonthYear: periodType === "MONTHLY" ? selectedMonthYear : null,
+            //     selectedQuarter: periodType === "QUARTERLY" ? selectedQuarter : null,
+            //     selectedQuarterYear: periodType === "QUARTERLY" ? selectedQuarterYear : null,
+            // });
 
-                            const fromDate = fromParam ? parseDateFromString(fromParam) : undefined;
-                            const toDate = toParam ? parseDateFromString(toParam) : undefined;
+            const response = await getPeriodicBrokerage(
+                apiPeriodType, // periodType
+                period, // period
+                year, // year
+                currentPage, // page
+                PAGE_LIMIT, // limit
+                periodType === "QUARTERLY" ? selectedQuarter : undefined, // quarter
+                periodType === "QUARTERLY" ? selectedQuarterYear : undefined, // quarterYear
+                periodType === "MONTHLY" ? (monthRange.from.getMonth() + 1) : undefined, // startMonth
+                periodType === "MONTHLY" ? monthRange.from.getFullYear() : undefined, // startYear
+                periodType === "MONTHLY" ? (monthRange.to.getMonth() + 1) : undefined, // endMonth
+                periodType === "MONTHLY" ? monthRange.to.getFullYear() : undefined, // endYear
+                periodType === "DAILY" && selectedDateRange.from ? selectedDateRange.from.toISOString().split("T")[0] : undefined, // startDate
+                periodType === "DAILY" && selectedDateRange.to ? selectedDateRange.to.toISOString().split("T")[0] : undefined, // endDate
+                periodType === "DAILY" && selectedDateRange.from ? selectedDateRange.from.toISOString().split("T")[0] : undefined, // from
+                periodType === "DAILY" && selectedDateRange.to ? selectedDateRange.to.toISOString().split("T")[0] : undefined, // to
+            );
 
-                            const filterParams = {
-                                page: currentPage,
-                                limit: PAGE_LIMIT,
-                                periodType: PeriodType.MONTH,
-                                ...(fromDate && toDate
-                                    ? {
-                                            from: formatDateString(fromDate),
-                                            to: formatDateString(toDate),
-                                        }
-                                    : {}),
-                            };
+            // Log API response for debugging
+            // console.log("API Response:", response);
 
-                            // console.log(`🔍 Fetching monthly data with URL date parameters:`, filterParams);
-                            response = await getBrokerageRecords(filterParams);
-                        } else {
-                            const currentDate = new Date();
-                            const defaultMonth = currentDate.getMonth() + 1;
-                            const defaultYear = currentDate.getFullYear();
+            if (response.success && response.data) {
+                // Handle the response data structure properly
+                let dataArray: (DailyBrokerageRecord | MonthlyBrokerageSummary | QuarterlyBrokerageSummary)[] = [];
 
-                            const isEmptyDateRange = Object.keys(dateRange).length === 0;
-
-                            if (isEmptyDateRange) {
-                                const cleanParams = {
-                                    page: currentPage,
-                                    limit: PAGE_LIMIT,
-                                    periodType: PeriodType.MONTH,
-                                };
-
-                                response = await getBrokerageRecords(cleanParams);
-                            } else {
-                                response = await getAllPeriodicBrokerage(
-                                    PeriodType.MONTH,
-                                    defaultMonth,
-                                    defaultYear,
-                                    currentPage,
-                                    PAGE_LIMIT,
-                                );
-                            }
-                        }
+                if (Array.isArray(response.data)) {
+                    dataArray = response.data;
+                } else if (typeof response.data === "object" && response.data !== null) {
+                    // Handle legacy response structure
+                    if (response.data.daily) {
+                        dataArray = response.data.daily.map(item => ({
+                            id: item.id,
+                            clientId: item.clientId,
+                            clientName: item.clientName,
+                            date: new Date(item.date),
+                            totalDailyBrokerage: item.totalDailyBrokerage,
+                        }));
+                    } else if (response.data.quarterly) {
+                        dataArray = response.data.quarterly.map(item => ({
+                            clientId: item.clientId,
+                            clientName: `Client ${item.clientId}`, // Fallback if name not available
+                            period: {
+                                quarter: item.quarter,
+                                year: item.year,
+                            },
+                            brokerageAmount: item.totalBrokerage,
+                        }));
                     }
                 }
 
-                if (response && response.success && Array.isArray(response.data)) {
-                    setBrokerageData(response.data);
+                setBrokerageData(dataArray);
 
-                    const totalBrokerage = response.data.reduce(
-                        (sum: number, item: BrokerageItem) => sum + (item?.brokerageAmount || 0),
-                        0,
-                    );
-                    setTotalBrokerageAmount(totalBrokerage);
-
-                    // Update pagination data from the server response
-                    if (response.metadata) {
-                        setServerPaginationData({
-                            totalPages: response.metadata.totalPages || Math.ceil(response.metadata.total / PAGE_LIMIT),
-                        });
+                // Calculate total brokerage amount
+                const total = dataArray.reduce((sum: number, item: any) => {
+                    if ("totalDailyBrokerage" in item) {
+                        return sum + item.totalDailyBrokerage;
+                    } else if ("brokerageAmount" in item) {
+                        return sum + item.brokerageAmount;
                     }
-                } else {
-                    setBrokerageData([]);
-                    setTotalBrokerageAmount(0);
-                    setServerPaginationData({ totalPages: 1 });
-                    console.warn("⚠️ Received invalid brokerage data", response);
+                    return sum;
+                }, 0);
+                setTotalBrokerageAmount(total);
+
+                // Update pagination data
+                if (response.metadata) {
+                    _setServerPaginationData({
+                        totalPages: response.metadata.totalPages,
+                        total: response.metadata.total,
+                    });
+                    setTotalPages(response.metadata.totalPages);
                 }
-            } catch (error) {
-                toast.error("Failed to fetch brokerage data");
-                console.error("Error fetching brokerage data:", error);
-            } finally {
-                setIsLoading(false);
+            } else {
+                setBrokerageData([]);
+                setTotalBrokerageAmount(0);
+                _setServerPaginationData({ totalPages: 1, total: 0 });
+                setTotalPages(1);
             }
-        };
+        } catch (error) {
+            console.error("Error fetching brokerage data:", error);
+            toast.error("Failed to fetch brokerage data");
+            setBrokerageData([]);
+            setTotalBrokerageAmount(0);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [periodType, selectedMonthYear, monthRange, selectedQuarter, selectedQuarterYear, currentPage, selectedDateRange, syncStateToURL]);
 
-        fetchData();
-    }, [periodType, selectedClientId, dateRange, selectedQuarter, selectedYear, currentPage]);
-
+    // Fetch data when component mounts or dependencies change
     useEffect(() => {
-        if (periodType === PeriodType.QUARTER) {
-            updateURLParams({
-                quarter: selectedQuarter.toString(),
-                year: selectedYear.toString(),
-                // Clear date range params when in quarterly mode
-                from: null,
-                to: null,
-            });
-        } else if (periodType === PeriodType.MONTH) {
-            if (dateRange.from && dateRange.to) {
-                updateURLParams({
-                    from: formatDateString(dateRange.from),
-                    to: formatDateString(dateRange.to),
-                    quarter: null,
-                    year: null,
-                });
-            } else if (Object.keys(dateRange).length === 0) {
-                updateURLParams({
-                    from: null,
-                    to: null,
-                    periodType: PeriodType.MONTH,
-                });
-            }
-        }
-    }, [selectedQuarter, selectedYear, periodType, dateRange, updateURLParams]);
-
-    const handleDateChange = (range: MonthRange) => {
-        const isClearing = !range.from && !range.to;
-
-        if (isClearing) {
-            setDateRange({});
-        } else {
-            setDateRange(range);
-        }
-
-        setCurrentPage(1);
-
-        const params: Record<string, string | null> = {
-            page: "1",
-        };
-
-        if (range.from && range.to) {
-            params.from = formatDateString(range.from);
-            params.to = formatDateString(range.to);
-        } else {
-            params.from = null;
-            params.to = null;
-        }
-
-        if (selectedClientId) {
-            params.clientId = selectedClientId.toString();
-        }
-
-        if (isClearing) {
-            params.periodType = PeriodType.MONTH;
-            setPeriodType(PeriodType.MONTH);
-        } else if (!range.from || !range.to) {
-            params.periodType = PeriodType.MONTH;
-            setPeriodType(PeriodType.MONTH);
-        } else {
-            params.periodType = periodType;
-        }
-
-        if (periodType === PeriodType.QUARTER && !isClearing) {
-            params.quarter = selectedQuarter.toString();
-            params.year = selectedYear.toString();
-        } else {
-            params.quarter = null;
-            params.year = null;
-        }
-
-        updateURLParams(params);
-    };
-
-    const paginatedData = brokerageData;
+        fetchBrokerageData();
+    }, [fetchBrokerageData]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
-        updateURLParams({ page: page.toString() });
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        // URL will be updated by fetchBrokerageData via syncStateToURL
+    };
+
+    // Handle period type change with URL clearing
+    const handlePeriodTypeChange = (newPeriodType: PeriodType) => {
+        setPeriodType(newPeriodType);
+        setCurrentPage(1); // Reset to first page
+
+        // Clear URL parameters and set new period type
+        const params: Record<string, string | number | undefined> = {
+            periodType: newPeriodType,
+            page: 1,
+        };
+
+        updateURL(params);
+
+        // Reset state based on period type
+        if (newPeriodType === "DAILY") {
+            setSelectedDateRange({
+                from: startOfMonth(new Date()),
+                to: new Date(),
+            });
+        } else if (newPeriodType === "MONTHLY") {
+            const now = new Date();
+            setMonthRange({
+                from: startOfMonth(new Date(now.getFullYear(), 0, 1)),
+                to: endOfMonth(addMonths(new Date(now.getFullYear(), 0, 1), now.getMonth() - 1)),
+            });
+            setSelectedMonthYear(new Date().getFullYear());
+        } else if (newPeriodType === "QUARTERLY") {
+            setSelectedQuarter(1);
+            setSelectedQuarterYear(new Date().getFullYear());
+        }
     };
 
     return (
@@ -394,144 +353,90 @@ const Brokerage: React.FC = () => {
             <div className="flex-col md:flex md:flex-row justify-between w-full">
                 <h1 className="text-3xl font-semibold">Fees</h1>
                 <div className="flex-col md:flex md:flex-row gap-4 items-center">
+                    {/* Period Type Dropdown */}
                     <div className="flex min-w-50">
                         <Select
-                            value={selectedClientId ? String(selectedClientId) : "all"}
-                            onValueChange={(value) => {
-                                const newClientId = value === "all" ? undefined : Number(value);
-                                setSelectedClientId(newClientId);
-                                setCurrentPage(1);
-
-                                const params: Record<string, string | null> = {
-                                    clientId: newClientId ? String(newClientId) : null,
-                                    page: "1",
-                                };
-
-                                updateURLParams(params);
-                            }}
-                        >
-                            <SelectTrigger className="w-full ring-0">
-                                <SelectValue placeholder="All Clients" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Clients</SelectItem>
-                                {clients.map(client => (
-                                    <SelectItem
-                                        className="cursor-pointer text-sm"
-                                        key={client.id}
-                                        value={String(client.id)}
-                                    >
-                                        {client.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex min-w-50 ml-0 md:ml-2 mt-2 md:mt-0">
-                        <Select
                             value={periodType}
-                            onValueChange={(value) => {
-                                const newPeriodType = value as PeriodType;
-                                setPeriodType(newPeriodType);
-                                setCurrentPage(1);
-
-                                setDateRange({});
-
-                                const newParams: Record<string, string> = {
-                                    periodType: newPeriodType,
-                                    page: "1",
-                                };
-
-                                if (newPeriodType === PeriodType.QUARTER) {
-                                    newParams.quarter = selectedQuarter.toString();
-                                    newParams.year = selectedYear.toString();
-                                }
-
-                                if (selectedClientId) {
-                                    newParams.clientId = selectedClientId.toString();
-                                }
-
-                                const queryString = new URLSearchParams(newParams).toString();
-                                router.replace(`${pathname}?${queryString}`, { scroll: false });
-                            }}
+                            onValueChange={value => handlePeriodTypeChange(value as PeriodType)}
                         >
                             <SelectTrigger className="w-full ring-0">
                                 <SelectValue placeholder="Period Type" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value={PeriodType.MONTH}>Monthly</SelectItem>
-                                <SelectItem value={PeriodType.QUARTER}>Quarterly</SelectItem>
+                                <SelectItem value="DAILY">Daily</SelectItem>
+                                <SelectItem value="MONTHLY">Monthly</SelectItem>
+                                <SelectItem value="QUARTERLY">Quarterly</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
-                    {/* Show year selector for quarterly view */}
-                    {periodType === PeriodType.QUARTER && (
-                        <div className="flex min-w-50 ml-0 md:ml-2 mt-2 md:mt-0">
-                            <Select
-                                value={selectedYear.toString()}
-                                onValueChange={(value) => {
-                                    const year = Number.parseInt(value);
-                                    setSelectedYear(year);
-                                    setCurrentPage(1);
+                    {/* Daily: Date Range Picker Button with Popover */}
+                    {periodType === "DAILY" && (
+                        <div className="w-full md:w-auto">
 
-                                    updateURLParams({
-                                        year: year.toString(),
-                                        page: "1",
-                                    });
-                                }}
-                            >
-                                <SelectTrigger className="w-full ring-0">
-                                    <SelectValue placeholder="Select Year" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {getAvailableYears().map(year => (
-                                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-
-                    {/* Show quarter selector for quarterly view */}
-                    {periodType === PeriodType.QUARTER && (
-                        <div className="flex min-w-50 ml-0 md:ml-2 mt-2 md:mt-0">
-                            <Select
-                                value={selectedQuarter.toString()}
-                                onValueChange={(value) => {
-                                    const quarter = Number.parseInt(value);
-                                    setSelectedQuarter(quarter);
-                                    setCurrentPage(1);
-
-                                    updateURLParams({
-                                        quarter: quarter.toString(),
-                                        page: "1",
-                                    });
-                                }}
-                            >
-                                <SelectTrigger className="w-full ring-0">
-                                    <SelectValue placeholder="Select Quarter" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {getQuarters().map(quarter => (
-                                        <SelectItem key={quarter} value={quarter.toString()}>
-                                            {getQuarterName(quarter)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-
-                    {/* Show month range picker for monthly view */}
-                    {periodType === PeriodType.MONTH && (
-                        <div className="md:w-1/2 w-full mt-2 md:mt-0">
-                            <MonthRangePicker
-                                onChange={handleDateChange}
-                                from={dateRange.from ? format(dateRange.from, "yyyy-MM-dd") : undefined}
-                                to={dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : undefined}
+                            <RangeDatePicker
+                                from={selectedDateRange.from ? format(selectedDateRange.from, "yyyy-MM-dd") : undefined}
+                                to={selectedDateRange.to ? format(selectedDateRange.to, "yyyy-MM-dd") : undefined}
+                                onChange={(range: { from?: Date; to?: Date }) => setSelectedDateRange(range)}
                             />
+
                         </div>
+                    )}
+
+                    {/* Monthly: Month Range Picker and Year Selector */}
+                    {periodType === "MONTHLY" && (
+                        <>
+
+                            <div className="md:w-1/2 w-full mt-2 md:mt-0">
+                                <MonthRangePicker
+                                    onChange={(range) => {
+                                        if (range.from && range.to) {
+                                            setMonthRange({ from: new Date(range.from), to: new Date(range.to) });
+                                        }
+                                    }}
+                                    from={monthRange.from ? format(monthRange.from, "yyyy-MM-dd") : undefined}
+                                    to={monthRange.to ? format(monthRange.to, "yyyy-MM-dd") : undefined}
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {/* Quarterly: Year and Quarter Selectors */}
+                    {periodType === "QUARTERLY" && (
+                        <>
+                            <div className="flex min-w-50 ml-0 md:ml-2 mt-2 md:mt-0">
+                                <Select
+                                    value={selectedQuarterYear.toString()}
+                                    onValueChange={value => setSelectedQuarterYear(Number(value))}
+                                >
+                                    <SelectTrigger className="w-full ring-0">
+                                        <SelectValue placeholder="Select Year" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {getAvailableYears().map(year => (
+                                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex min-w-50 ml-0 md:ml-2 mt-2 md:mt-0">
+                                <Select
+                                    value={selectedQuarter.toString()}
+                                    onValueChange={value => setSelectedQuarter(Number(value))}
+                                >
+                                    <SelectTrigger className="w-full ring-0">
+                                        <SelectValue placeholder="Select Quarter" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {getQuarters().map(quarter => (
+                                            <SelectItem key={quarter} value={quarter.toString()}>
+                                                {getQuarterName(quarter)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
@@ -547,7 +452,6 @@ const Brokerage: React.FC = () => {
                     isLoading={isLoading}
                 />
             </div>
-
             <div className="h-full flex flex-col flex-grow gap-10 justify-between">
                 <div className="w-full h-full flex flex-col justify-between border rounded-xl border-[#EFF6FF]">
                     <Table className="bg-white">
@@ -556,60 +460,93 @@ const Brokerage: React.FC = () => {
                                 <TableHead className="rounded-tl-xl">No.</TableHead>
                                 <TableHead>Client</TableHead>
                                 <TableHead>Total Fees</TableHead>
-                                <TableHead className="rounded-tr-xl">{periodType === PeriodType.QUARTER ? "Quarter" : (periodType === PeriodType.MONTH ? "Month" : "Period")}</TableHead>
+                                <TableHead className="rounded-tr-xl">
+                                    {periodType === "QUARTERLY"
+                                        ? "Quarter"
+                                        : periodType === "MONTHLY"
+                                            ? "Month"
+                                            : "Date"}
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
-
                         <TableBody>
                             {isLoading
                                 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8">Loading Fees data...</TableCell>
+                                            <TableCell colSpan={4} className="text-center py-8">
+                                                Loading...
+                                            </TableCell>
                                         </TableRow>
                                     )
-                                : paginatedData.length === 0
+                                : brokerageData.length === 0
                                     ? (
                                             <TableRow>
-                                                <TableCell colSpan={4} className="text-center py-8">No Fees records found</TableCell>
+                                                <TableCell colSpan={4} className="text-center py-8">
+                                                    No data available
+                                                </TableCell>
                                             </TableRow>
                                         )
-                                    : paginatedData.map((item: BrokerageItem, index: number) => {
-                                        // Format the brokerage amount as currency
-                                            const formattedAmount = new Intl.NumberFormat("en-IN", {
-                                                style: "currency",
-                                                currency: "INR",
-                                                maximumFractionDigits: 2,
-                                            }).format(item.brokerageAmount);
+                                    : (
+                                            brokerageData.map((item, index) => {
+                                                const serialNumber = (currentPage - 1) * PAGE_LIMIT + index + 1;
 
-                                            return (
-                                                <TableRow
-                                                // Create a unique composite key using clientId, date, and index to prevent duplicate key issues
-                                                    key={`${item.clientId}-${item.date}-${index}`}
-                                                    className="w-full py-10 gap-4 mx-3"
-                                                >
-                                                    <TableCell>{((currentPage - 1) * PAGE_LIMIT) + index + 1}</TableCell>
-                                                    <TableCell>{item.clientName}</TableCell>
-                                                    <TableCell className="text-green-500">{formattedAmount}</TableCell>
-                                                    <TableCell>{item.date}</TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
+                                                // Determine the display values based on item type
+                                                let clientName = "";
+                                                let amount = 0;
+                                                let periodDisplay = "";
 
+                                                if ("totalDailyBrokerage" in item) {
+                                                    // Daily brokerage record
+                                                    clientName = item.clientName;
+                                                    amount = item.totalDailyBrokerage;
+                                                    periodDisplay = new Date(item.date).toLocaleDateString();
+                                                } else if ("brokerageAmount" in item) {
+                                                    // Monthly or Quarterly summary
+                                                    clientName = item.clientName;
+                                                    amount = item.brokerageAmount;
+
+                                                    if ("period" in item && typeof item.period === "object") {
+                                                        if ("quarter" in item.period) {
+                                                            periodDisplay = `Q${item.period.quarter} ${item.period.year}`;
+                                                        } else if ("month" in item.period) {
+                                                            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                                            periodDisplay = `${monthNames[item.period.month - 1]} ${item.period.year}`;
+                                                        }
+                                                    }
+                                                }
+
+                                                return (
+                                                    <TableRow key={`${item.clientId}-${index}`}>
+                                                        <TableCell>{serialNumber}</TableCell>
+                                                        <TableCell>{clientName}</TableCell>
+                                                        <TableCell className="text-green-500">
+                                                            {new Intl.NumberFormat("en-IN", {
+                                                                style: "currency",
+                                                                currency: "INR",
+                                                                maximumFractionDigits: 2,
+                                                            }).format(amount)}
+                                                        </TableCell>
+                                                        <TableCell>{periodDisplay}</TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        )}
                         </TableBody>
                     </Table>
                 </div>
-
-                {serverPaginationData.totalPages > 1 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={serverPaginationData.totalPages}
-                        onPageChange={handlePageChange}
-                    />
-                )}
+                {
+                    totalPages > 1 && (
+                        <div className="flex justify-center mt-4">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={handlePageChange}
+                            />
+                        </div>
+                    )
+                }
             </div>
-
         </div>
-
     );
 };
 

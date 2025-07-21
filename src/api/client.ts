@@ -88,7 +88,7 @@ export async function updateClient(data: ClientUpdateRequest): Promise<Client> {
 
 // delete client
 export async function deleteClient(id: number): Promise<{ success: boolean; message: string }> {
-    console.log(`Deleting client with ID: ${id}`);
+    // console.log(`Deleting client with ID: ${id}`);
 
     const response = await ApiDelete<{ success: boolean; message: string }>(`/clients/${id}`);
 

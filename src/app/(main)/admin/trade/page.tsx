@@ -143,7 +143,7 @@ const TradePage: React.FC = () => {
     });
 
     // Log the response for debugging
-    console.log("Trades response:", tradesResponse);
+    // console.log("Trades response:", tradesResponse);
 
     // Get trade data and pagination from response
     const trades = tradesResponse?.data || [];

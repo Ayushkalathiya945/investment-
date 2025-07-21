@@ -163,7 +163,7 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                 description: data.description || undefined,
             };
 
-            console.error("Submitting payment data:", paymentData);
+            // console.error("Submitting payment data:", paymentData);
 
             await createPaymentMutation.mutateAsync(paymentData);
             toast.dismiss(loadingToast);

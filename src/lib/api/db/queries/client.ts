@@ -4,7 +4,7 @@ import type { TransactionType } from "../index";
 import type { NewClient } from "../schema";
 
 import { getDB } from "../index";
-import { brokerages, clients, payments, trades, TradeType } from "../schema";
+import { clients, dailyBrokerage, payments, trades, TradeType } from "../schema";
 
 export async function create(data: NewClient, tx?: TransactionType) {
     const [client] = await getDB(tx).insert(clients).values(data).returning();
@@ -177,12 +177,12 @@ export async function calculateFinancialTotalsByDateRange(
             eq(trades.isFullySold, 0),
         ];
 
-        if (from && to) {
-            baseConditions.push(
-                gte(trades.tradeDate, new Date(from).getTime()),
-                lte(trades.tradeDate, endOfDayTo!.getTime()),
-            );
-        }
+        // if (from && to) {
+        //     baseConditions.push(
+        //         gte(trades.tradeDate, new Date(from).getTime()),
+        //         lte(trades.tradeDate, endOfDayTo!.getTime()),
+        //     );
+        // }
 
         const portfolioValueQuery = db
             .select({
@@ -198,24 +198,33 @@ export async function calculateFinancialTotalsByDateRange(
             .where(and(...baseConditions));
 
         // Brokerage
-        const brokerageQuery = db
-            .select({
-                totalBrokerage: sql<number>`COALESCE(SUM(${brokerages.brokerageAmount}), 0)`,
-            })
-            .from(brokerages);
+        // const brokerageQuery = db
+        //     .select({
+        //         totalBrokerage: sql<number>`COALESCE(SUM(${brokerages.brokerageAmount}), 0)`,
+        //     })
+        //     .from(brokerages);
 
-        if (from) {
-            const fromMonth = from.getMonth() + 1;
-            if (fromMonth !== null) {
-                brokerageQuery.where(gte(brokerages.month, fromMonth));
-            }
-        }
-        if (to) {
-            const toMonth = to.getMonth() + 1;
-            if (toMonth !== null) {
-                brokerageQuery.where(lte(brokerages.month, toMonth));
-            }
-        }
+        // if (from) {
+        //     const fromMonth = from.getMonth() + 1;
+        //     if (fromMonth !== null) {
+        //         brokerageQuery.where(gte(brokerages.month, fromMonth));
+        //     }
+        // }
+        // if (to) {
+        //     const toMonth = to.getMonth() + 1;
+        //     if (toMonth !== null) {
+        //         brokerageQuery.where(lte(brokerages.month, toMonth));
+        //     }
+        // }
+
+        const fees = db.select({
+            totalFees: sql<number>`COALESCE(SUM(${dailyBrokerage.totalDailyBrokerage}), 0)`,
+        }).from(dailyBrokerage);
+
+        if (from)
+            fees.where(gte(dailyBrokerage.date, from));
+        if (to)
+            fees.where(lte(dailyBrokerage.date, endOfDayTo!));
 
         // Payment
         const paymentsQuery = db
@@ -240,8 +249,8 @@ export async function calculateFinancialTotalsByDateRange(
 
         // Only apply the end date filter
         // We don't filter by from date because we need all BUY transactions up to the end date
-        if (to)
-            buyTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
+        // if (to)
+        //     buyTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
 
         // Get total SELL trades value up to the end date (not limited by start date)
         // For accurate purse amount calculation, we need ALL sell trades up to the end date
@@ -254,8 +263,8 @@ export async function calculateFinancialTotalsByDateRange(
 
         // Only apply the end date filter
         // We don't filter by from date because we need all SELL transactions up to the end date
-        if (to)
-            sellTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
+        // if (to)
+        //     sellTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
 
         // Get total purse amount (initial value from all clients)
         // We don't filter the purse amount by date because it represents the initial amount
@@ -266,25 +275,25 @@ export async function calculateFinancialTotalsByDateRange(
             })
             .from(clients);
 
-        const [clientCount, portfolioResult, brokerageResult, paymentsResult, buyTradesResult, sellTradesResult, purseAmountResult]
+        const [clientCount, portfolioResult, paymentsResult, buyTradesResult, sellTradesResult, purseAmountResult, feesResult]
             = await Promise.all([
                 clientCountQuery.execute(),
                 portfolioValueQuery.execute(),
-                brokerageQuery.execute(),
                 paymentsQuery.execute(),
                 buyTradesQuery.execute(),
                 sellTradesQuery.execute(),
                 purseAmountQuery.execute(),
+                fees.execute(),
             ]);
 
         const result = {
             totalClient: Number(clientCount[0]?.count || 0),
             totalPortfolioValue: Number(portfolioResult[0]?.totalValue || 0),
-            totalBrokerage: Number(brokerageResult[0]?.totalBrokerage || 0),
             totalPayments: Number(paymentsResult[0]?.totalPayments || 0),
             totalBuyTrades: Number(buyTradesResult[0]?.totalBuyTrades || 0),
             totalSellTrades: Number(sellTradesResult[0]?.totalSellTrades || 0),
             totalPurseAmount: Number(purseAmountResult[0]?.totalPurseAmount || 0),
+            totalFees: Number(feesResult[0]?.totalFees || 0),
         };
 
         // console.log("Financial totals calculated:", result);
@@ -295,7 +304,7 @@ export async function calculateFinancialTotalsByDateRange(
         return {
             totalClient: 0,
             totalPortfolioValue: 0,
-            totalBrokerage: 0,
+            totalFees: 0,
             totalPayments: 0,
             totalBuyTrades: 0,
             totalSellTrades: 0,

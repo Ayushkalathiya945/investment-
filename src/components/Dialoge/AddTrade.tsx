@@ -174,12 +174,12 @@ const AddTrade: React.FC<AddTradeProps> = ({
 
     useEffect(() => {
         if (isEditMode && tradeDetails) {
-            console.log("Populating form with trade details:", tradeDetails);
+            // console.log("Populating form with trade details:", tradeDetails);
 
             try {
                 const tradeData = tradeDetails.trade ? tradeDetails.trade : tradeDetails;
 
-                console.log("Working with trade data:", tradeData);
+                // console.log("Working with trade data:", tradeData);
 
                 const exchange = (tradeData.exchange === "BSE")
                     ? "BSE" as const
@@ -190,17 +190,17 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     if (typeof tradeData.tradeDate === "number") {
                         const dateObj = new Date(tradeData.tradeDate);
                         formattedTradeDate = dateObj.toISOString().split("T")[0];
-                        console.log(`Converted timestamp ${tradeData.tradeDate} to date: ${formattedTradeDate}`);
+                        // console.log(`Converted timestamp ${tradeData.tradeDate} to date: ${formattedTradeDate}`);
                     } else if (typeof tradeData.tradeDate === "string") {
                         if (tradeData.tradeDate.includes("T")) {
                             formattedTradeDate = tradeData.tradeDate.split("T")[0];
                         } else {
                             formattedTradeDate = tradeData.tradeDate;
                         }
-                        console.log(`Using string date: ${formattedTradeDate}`);
+                        // console.log(`Using string date: ${formattedTradeDate}`);
                     } else if (tradeData.tradeDate instanceof Date) {
                         formattedTradeDate = tradeData.tradeDate.toISOString().split("T")[0];
-                        console.log(`Converted Date object to: ${formattedTradeDate}`);
+                        // console.log(`Converted Date object to: ${formattedTradeDate}`);
                     }
                 } else {
                     console.warn("Trade date is missing, using current date");
@@ -628,7 +628,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                                                 </Card>
                                                                             )}
 
-                                                                            <ScrollArea className="h-64 overflow-hidden border rounded-md" style={{ display: "block" }}>
+                                                                            <ScrollArea className="h-64 overflow-auto border rounded-md" style={{ display: "block" }}>
                                                                                 <div className="p-2 pb-3">
                                                                                     {loadingClients
 

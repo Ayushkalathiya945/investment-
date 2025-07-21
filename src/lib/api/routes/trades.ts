@@ -1,27 +1,24 @@
 import { zValidator } from "@hono/zod-validator";
-import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 
 import type { TransactionType } from "../db";
-import type {
-    ExchangeType,
-    FifoProcessingResult,
-    NewFifoAllocation,
-    Trade,
-} from "../db/schema";
+import type { ExchangeType, NewFifoAllocation, NewTrade, Trade } from "../db/schema";
 
 import { getDB } from "../db";
 import * as clientQueries from "../db/queries/client";
 import * as fifoQueries from "../db/queries/fifoAllocation";
 import * as stockQueries from "../db/queries/stock";
 import * as tradeQueries from "../db/queries/trade";
-import {
-    brokerageDetails,
-    TradeType,
-} from "../db/schema";
+import { TradeType } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { tradeFilterSchema, tradeGetOneSchema, tradeSchema, updateTradeSchema } from "../utils/validation-schemas";
+
+type FifoProcessingResult = {
+    allocations: NewFifoAllocation[];
+    updatedBuyTrades: Array<{ tradeId: number; remainingQuantity: number; isFullySold: boolean }>;
+    totalPnl: number;
+};
 
 // Create a new Hono router for trade routes
 const tradeRouter = new Hono();
@@ -51,17 +48,55 @@ async function processSellTrade(
 ): Promise<FifoProcessingResult> {
     const { clientId, symbol, exchange, quantity, price, tradeDate, id: sellTradeId } = sellTrade;
 
+    // Convert the tradeDate to timestamp
+    // console.log("tradeDate type and value:", typeof tradeDate, tradeDate);
+
+    // Ensure tradeDate is a Date object before calling getTime()
+    let tradeTimestamp: number;
+    if (tradeDate instanceof Date) {
+        // console.log("tradeDate is a Date object");
+        tradeTimestamp = tradeDate.getTime();
+        // console.log("tradeTimestamp is:", tradeTimestamp);
+    } else if (typeof tradeDate === "number") {
+        // console.log("tradeDate is a number");
+        // If it's already a timestamp
+        tradeTimestamp = tradeDate;
+        // console.log("tradeTimestamp is:", tradeTimestamp);
+    } else if (typeof tradeDate === "string") {
+        // If it's a string, parse it to Date first
+        const parsedDate = new Date(tradeDate);
+        if (Number.isNaN(parsedDate.getTime())) {
+            throw new HTTPException(400, { message: "Invalid trade date format" });
+        }
+        tradeTimestamp = parsedDate.getTime();
+    } else {
+        throw new HTTPException(400, { message: "Invalid trade date type" });
+    }
+
+    // console.log("tradeTimestamp is: after", tradeTimestamp);
+
+    if (tradeTimestamp === null || Number.isNaN(tradeTimestamp)) {
+        // console.log("tradeTimestamp is null or NaN");
+        throw new HTTPException(400, { message: "Invalid trade date" });
+    }
+
+    // console.log("before findBuyTradesWithRemainingQuantity");
+
     // Find all unsold BUY trades for this client/stock, ordered by oldest first (FIFO)
     const availableBuyTrades = await tradeQueries.findBuyTradesWithRemainingQuantity(
         {
             clientId,
             symbol,
             exchange,
-            tradeDate,
-
+            tradeDate: tradeTimestamp,
         },
         tx,
     );
+
+    // console.log("Available buy trades:", availableBuyTrades.length);
+    // if (availableBuyTrades.length > 0) {
+    //     console.log("First buy trade tradeDate type and value:", typeof availableBuyTrades[0].tradeDate, availableBuyTrades[0].tradeDate);
+    // }
 
     // console.log("Available BUY trades:", availableBuyTrades);
 
@@ -85,7 +120,12 @@ async function processSellTrade(
     let totalPnl = 0;
 
     // Sort trades by oldest purchase date first (FIFO)
-    const sortedBuyTrades = [...availableBuyTrades].sort((a, b) => a.tradeDate - b.tradeDate);
+    // Ensure we're comparing numbers for the sort
+    const sortedBuyTrades = [...availableBuyTrades].sort((a, b) => {
+        const aDate = Number(a.tradeDate);
+        const bDate = Number(b.tradeDate);
+        return aDate - bDate;
+    });
 
     // Consume from buy trades until we've sold all requested shares
     for (const buyTrade of sortedBuyTrades) {
@@ -102,7 +142,10 @@ async function processSellTrade(
         const buyValue = qtyToSell * buyTrade.price;
         const sellValue = qtyToSell * price;
         const profitLoss = sellValue - buyValue;
-        const holdingDays = Math.floor((tradeDate - buyTrade.tradeDate) / (1000 * 60 * 60 * 24));
+        // Calculate holding days - both dates should be timestamps
+        // buyTrade.tradeDate is already a timestamp from SQLite
+        const sellTimestamp = tradeTimestamp;
+        const holdingDays = Math.floor((sellTimestamp - buyTrade.tradeDate) / (1000 * 60 * 60 * 24));
 
         // Update remainingQuantity on the buy trade
         const newRemainingQty = remainingQty - qtyToSell;
@@ -116,6 +159,7 @@ async function processSellTrade(
         });
 
         // Create FIFO allocation record
+        // For SQLite storage with timestamp mode, we need to pass Date objects
         const fifoAllocation: NewFifoAllocation = {
             sellTradeId,
             buyTradeId,
@@ -125,12 +169,13 @@ async function processSellTrade(
             quantityAllocated: qtyToSell,
             buyPrice: buyTrade.price,
             sellPrice: price,
-            buyDate: buyTrade.tradeDate,
-            sellDate: tradeDate,
+            buyDate: buyTrade.tradeDate instanceof Date ? buyTrade.tradeDate : new Date(buyTrade.tradeDate),
+            sellDate: new Date(tradeTimestamp),
             buyValue,
             sellValue,
             profitLoss,
             holdingDays,
+            createdAt: new Date(),
         };
 
         allocations.push(fifoAllocation);
@@ -186,7 +231,7 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
         notes?: string;
     };
 
-    console.log("Creating trade with data:", tradeData);
+    // console.log("Creating trade with data:", tradeData);
 
     try {
         // Validate client exists
@@ -204,23 +249,33 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
         // Calculate net amount
         const tradeValue = tradeData.quantity * tradeData.price;
 
-        // Convert date strings to timestamps
-        const tradeDate = new Date(tradeData.tradeDate).getTime();
+        // Convert date string to Date object
+        let parsedTradeDate: Date;
+        try {
+            parsedTradeDate = new Date(tradeData.tradeDate);
+            if (Number.isNaN(parsedTradeDate.getTime())) {
+                console.error("Invalid trade date format:", tradeData.tradeDate);
+                throw new Error("Invalid date");
+            }
+        } catch (e) {
+            console.error("Date parsing error:", e, "Input:", tradeData.tradeDate);
+            throw new HTTPException(400, { message: "Invalid trade date format" });
+        }
 
         // Use a transaction for all database operations to ensure consistency
         const db = getDB();
         return await db.transaction(async (tx: TransactionType) => {
-            // Create trade record first            // Prepare the trade data with proper FIFO tracking fields
-            const tradeData2Create = {
+            // Create trade record first with proper FIFO tracking fields
+            const tradeData2Create: NewTrade = {
                 clientId: tradeData.clientId,
                 symbol: tradeData.symbol,
                 type: tradeData.type,
                 exchange: tradeData.exchange,
                 quantity: tradeData.quantity,
                 price: tradeData.price,
-                tradeDate,
+                tradeDate: parsedTradeDate, // Use the already parsed Date object
                 netAmount: tradeValue,
-                notes: tradeData.notes,
+                notes: tradeData.notes || null,
                 // FIFO tracking fields
                 originalQuantity: tradeData.type === TradeType.BUY ? tradeData.quantity : 0,
                 remainingQuantity: tradeData.type === TradeType.BUY ? tradeData.quantity : 0,
@@ -228,7 +283,7 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
                 sellProcessed: tradeData.type === TradeType.SELL ? 0 : 1,
             };
 
-            console.log("Creating trade with data:", tradeData2Create);
+            // console.log("Creating trade with data:", tradeData2Create);
 
             const trade = await tradeQueries.create(
                 tradeData2Create,
@@ -244,6 +299,7 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
                 // For BUY trades, the FIFO fields are already set
                 await processBuyTrade(trade, tx);
             } else if (tradeData.type === TradeType.SELL) {
+                // console.log("Processing sell trade with data:", tradeData);
                 // Process sell trade - create FIFO allocations
                 await processSellTrade(trade, tx);
             }
@@ -301,26 +357,7 @@ async function reverseTrade(
     trade: Trade,
     tx?: TransactionType,
 ): Promise<void> {
-    // Check if brokerage has already been calculated for this trade
-    if (trade.lastBrokerageCalculated) {
-        const year = Math.floor(trade.lastBrokerageCalculated / 100);
-        const month = trade.lastBrokerageCalculated % 100;
-        throw new HTTPException(409, {
-            message: `Cannot modify this trade as brokerage has already been calculated for ${month}/${year}. Please delete the brokerage calculation first.`,
-        });
-    }
-
-    // Double check for any brokerage calculations linked to this trade
-    const dbCheck = getDB(tx);
-    const brokerageDetailsForTrade = await dbCheck.query.brokerageDetails.findMany({
-        where: eq(brokerageDetails.tradeId, trade.id),
-    });
-
-    if (brokerageDetailsForTrade && brokerageDetailsForTrade.length > 0) {
-        throw new HTTPException(409, {
-            message: `Cannot modify this trade as it has associated brokerage calculations. `,
-        });
-    }
+    // Note: Brokerage validation removed as fields don't exist in current schema
 
     if (trade.type === TradeType.BUY) {
         // For a BUY trade, we need to check if any of the shares have been sold
@@ -345,14 +382,7 @@ async function reverseTrade(
                 throw new HTTPException(404, { message: `Buy trade not found for allocation ${allocation.id}` });
             }
 
-            // Check if the buy trade has brokerage calculated
-            if (buyTrade.lastBrokerageCalculated) {
-                const year = Math.floor(buyTrade.lastBrokerageCalculated / 100);
-                const month = buyTrade.lastBrokerageCalculated % 100;
-                throw new HTTPException(409, {
-                    message: `Cannot modify this sell trade as brokerage has already been calculated for the associated buy trade from ${month}/${year}. Please delete the brokerage calculation first.`,
-                });
-            }
+            // Note: Brokerage validation removed as field doesn't exist in current schema
 
             // Restore shares to the buy trade
             const newRemainingQty = buyTrade.remainingQuantity + allocation.quantityAllocated;
@@ -383,6 +413,11 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
         tradeDate?: string;
         notes?: string;
         exchange?: ExchangeType;
+        netAmount?: number;
+        originalQuantity?: number;
+        remainingQuantity?: number;
+        isFullySold?: number;
+        sellProcessed?: number;
     };
 
     try {
@@ -392,28 +427,7 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
             throw new HTTPException(404, { message: "Trade not found" });
         }
 
-        // Check if brokerage has already been calculated for this trade
-        if (existingTrade.lastBrokerageCalculated) {
-            const year = Math.floor(existingTrade.lastBrokerageCalculated / 100);
-            const month = existingTrade.lastBrokerageCalculated % 100;
-
-            // Throw an error and prevent update - stricter enforcement
-            throw new HTTPException(409, {
-                message: `Cannot modify this trade as brokerage has already been calculated for ${month}/${year}. Please delete the brokerage calculation first before modifying this trade.`,
-            });
-        }
-
-        // Double check directly with brokerageDetails table to ensure no brokerage exists for this trade
-        const dbCheck = getDB();
-        const brokerageDetailsForTrade = await dbCheck.query.brokerageDetails.findMany({
-            where: eq(brokerageDetails.tradeId, existingTrade.id),
-        });
-
-        if (brokerageDetailsForTrade && brokerageDetailsForTrade.length > 0) {
-            throw new HTTPException(409, {
-                message: `Cannot modify this trade as it has associated brokerage calculations. `,
-            });
-        }
+        // Note: Brokerage validation removed as fields don't exist in current schema
 
         // Validate client exists if clientId is being updated
         let clientId = existingTrade.clientId;
@@ -451,7 +465,7 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
                 exchange: stock.exchange,
                 quantity,
                 price: updateData.price ?? existingTrade.price,
-                tradeDate: updateData.tradeDate ? new Date(updateData.tradeDate as string).getTime() : existingTrade.tradeDate,
+                tradeDate: updateData.tradeDate ? new Date(updateData.tradeDate as string) : existingTrade.tradeDate,
                 netAmount: quantity * (updateData.price ?? existingTrade.price),
                 notes: updateData.notes ?? existingTrade.notes,
                 // FIFO tracking fields - adjust based on type
@@ -544,8 +558,27 @@ tradeRouter.post("/get-all", zValidator("json", tradeFilterSchema), async (c) =>
     };
 
     try {
-        const From = from ? new Date(from).getTime() : undefined;
-        const To = to ? new Date(to).getTime() : undefined;
+        // Safely convert date strings to timestamps
+        const From = from
+            ? (() => {
+                    const date = new Date(from);
+                    if (Number.isNaN(date.getTime())) {
+                        throw new HTTPException(400, { message: "Invalid 'from' date format" });
+                    }
+                    return date.getTime();
+                })()
+            : undefined;
+
+        const To = to
+            ? (() => {
+                    const date = new Date(to);
+                    if (Number.isNaN(date.getTime())) {
+                        throw new HTTPException(400, { message: "Invalid 'to' date format" });
+                    }
+                    return date.getTime();
+                })()
+            : undefined;
+
         const { trades: tradesList, count } = await tradeQueries.findAllWithPagination({
             page,
             limit,
@@ -615,26 +648,7 @@ tradeRouter.delete("/delete/:id", zValidator("param", tradeGetOneSchema), async 
             throw new HTTPException(404, { message: "Trade not found" });
         }
 
-        // Check if brokerage has already been calculated for this trade
-        if (trade.lastBrokerageCalculated) {
-            const year = Math.floor(trade.lastBrokerageCalculated / 100);
-            const month = trade.lastBrokerageCalculated % 100;
-            throw new HTTPException(409, {
-                message: `Cannot delete this trade as brokerage has already been calculated for ${month}/${year}. Please delete the brokerage calculation first.`,
-            });
-        }
-
-        // Double check for any brokerage calculations linked to this trade
-        const dbCheck = getDB();
-        const brokerageDetailsForTrade = await dbCheck.query.brokerageDetails.findMany({
-            where: eq(brokerageDetails.tradeId, trade.id),
-        });
-
-        if (brokerageDetailsForTrade && brokerageDetailsForTrade.length > 0) {
-            throw new HTTPException(409, {
-                message: `Cannot delete this trade as it has associated brokerage calculations.`,
-            });
-        }
+        // Note: Brokerage validation removed as fields don't exist in current schema
 
         // Use a transaction for all database operations to ensure consistency
         const db = getDB();

@@ -96,7 +96,7 @@ export type ClientAnalyticsResponse = {
         totalClient: number;
         totalValue: number;
         totalPayment: number;
-        totalBrokerage: number;
+        totalFees: number;
         remainingPurseAmount: number;
     };
     _debug?: {

@@ -38,7 +38,7 @@ export function formatDateForTradeApi(date: Date | undefined): string | undefine
 // Create a new trade
 export async function createTrade(data: CreateTradeRequest): Promise<{ data: Trade; message: string }> {
     try {
-        console.log("Creating trade with data:", JSON.stringify(data, null, 2));
+        // console.log("Creating trade with data:", JSON.stringify(data, null, 2));
 
         const response = await ApiPost<TradeResponse>("/trades/create", data);
 
@@ -144,7 +144,7 @@ export async function getAllTrades(data: TradeFilterRequest): Promise<TradesList
         to: data.endDate || undefined,
     };
 
-    console.log(requestData);
+    // console.log(requestData);
 
     const response = await ApiPost<any>("/trades/get-all", requestData);
 
@@ -171,7 +171,7 @@ export async function getAllTrades(data: TradeFilterRequest): Promise<TradesList
 // Get a trade by ID
 export async function getTradeById(id: number): Promise<any> { // Changed return type to 'any' to accommodate nested structure
     try {
-        console.log(`Fetching trade details for ID: ${id}`);
+        // console.log(`Fetching trade details for ID: ${id}`);
         const response = await ApiGet<any>(`/trades/get-one/${id}`);
 
         if (!response || !response.success) {
@@ -179,7 +179,7 @@ export async function getTradeById(id: number): Promise<any> { // Changed return
         }
 
         // Log the raw response to see the exact structure
-        console.log("Raw trade response:", response);
+        // console.log("Raw trade response:", response);
 
         // The API might return the trade directly or nested inside a 'trade' property
         const tradeResponse = response.data as any;
@@ -207,7 +207,7 @@ export async function getTradeById(id: number): Promise<any> { // Changed return
             }
         }
 
-        console.log(`Trade details processed:`, tradeResponse);
+        // console.log(`Trade details processed:`, tradeResponse);
 
         return tradeResponse;
     } catch (error: any) {
@@ -325,7 +325,7 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
             responseData.tradeDate = `${year}-${month}-${day}`;
         }
 
-        console.log("Processed update response:", responseData);
+        // console.log("Processed update response:", responseData);
 
         return {
             data: responseData,

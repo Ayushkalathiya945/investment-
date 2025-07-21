@@ -341,7 +341,7 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
                 totalClient: financialTotals.totalClient,
                 totalValue: financialTotals.totalPortfolioValue,
                 totalPayment: financialTotals.totalPayments,
-                totalBrokerage: financialTotals.totalBrokerage,
+                totalFees: financialTotals.totalFees,
                 remainingPurseAmount,
             },
             _debug: {

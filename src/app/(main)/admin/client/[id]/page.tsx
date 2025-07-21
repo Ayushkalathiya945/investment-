@@ -138,13 +138,23 @@ const ClientDetail: React.FC = () => {
             <div className="grid lg:grid-cols-5 md:grid-cols-2 grid-cols-1 justify-between gap-3 px-2">
                 <StatCard
                     icon={<IndianRupee />}
-                    value={typeof client.totalTradeAmount === "number" ? `₹${client.totalTradeAmount.toLocaleString("en-IN")}` : "₹0"}
+                    value={typeof client.totalTradeAmount === "number"
+                        ? `₹${client.totalTradeAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
+                        : "₹0"}
                     label="Total Portfolio Value"
                     isLoading={isLoading}
                 />
                 <StatCard
                     icon={<Wallet />}
-                    value={typeof client.purseAmount === "number" ? `₹${client.purseAmount.toLocaleString("en-IN")}` : "₹0"}
+                    value={typeof client.purseAmount === "number"
+                        ? `₹${client.purseAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
+                        : "₹0"}
                     label="Initial Purse Amount"
                     isLoading={isLoading}
                 />
@@ -152,7 +162,10 @@ const ClientDetail: React.FC = () => {
                 <StatCard
                     icon={<Wallet />}
                     value={typeof client.remainingPurseAmount === "number"
-                        ? `₹${client.remainingPurseAmount.toLocaleString("en-IN")}`
+                        ? `₹${client.remainingPurseAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
                         : "₹0"}
                     label="Remaining Purse Amount"
                     isLoading={isLoading}
@@ -167,13 +180,23 @@ const ClientDetail: React.FC = () => {
                 /> */}
                 <StatCard
                     icon={<TrendingUp />}
-                    value={typeof client.totalBrokerageAmount === "number" ? `₹${client.totalBrokerageAmount.toLocaleString("en-IN")}` : "₹0"}
+                    value={typeof client.totalBrokerageAmount === "number"
+                        ? `₹${client.totalBrokerageAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
+                        : "₹0"}
                     label="Total Fees"
                     isLoading={isLoading}
                 />
                 <StatCard
                     icon={<CreditCard />}
-                    value={typeof client.totalPaymentAmount === "number" ? `₹${client.totalPaymentAmount.toLocaleString("en-IN")}` : "₹0"}
+                    value={typeof client.totalPaymentAmount === "number"
+                        ? `₹${client.totalPaymentAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
+                        : "₹0"}
                     label="Total Payments"
                     isLoading={isLoading}
                 />

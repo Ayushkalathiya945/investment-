@@ -8,57 +8,17 @@ CREATE TABLE `admins` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `admins_email_unique` ON `admins` (`email`);--> statement-breakpoint
-CREATE TABLE `brokerage_details` (
+CREATE TABLE `amount_usage` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`brokerage_id` integer NOT NULL,
-	`trade_id` integer NOT NULL,
-	`symbol` text NOT NULL,
-	`exchange` text NOT NULL,
-	`quantity` integer NOT NULL,
-	`buy_price` real NOT NULL,
-	`buy_date` integer NOT NULL,
-	`holding_start_date` integer NOT NULL,
-	`holding_end_date` integer NOT NULL,
-	`holding_days` integer NOT NULL,
-	`total_days_in_month` integer NOT NULL,
-	`position_value` real NOT NULL,
-	`monthly_brokerage_rate` real DEFAULT 10 NOT NULL,
-	`daily_brokerage_rate` real NOT NULL,
-	`brokerage_amount` real NOT NULL,
-	`is_sold_in_month` integer DEFAULT 0 NOT NULL,
-	`sell_date` integer,
-	`sell_price` real,
-	`sell_value` real,
-	`partial_sale_quantity` integer,
-	`calculation_formula` text,
-	`notes` text,
+	`unused_amount_id` integer NOT NULL,
+	`buy_trade_id` integer NOT NULL,
+	`amount_used` real NOT NULL,
+	`usage_date` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`brokerage_id`) REFERENCES `brokerages`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`unused_amount_id`) REFERENCES `unused_amounts`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`buy_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `brokerage_trade_idx` ON `brokerage_details` (`brokerage_id`,`trade_id`);--> statement-breakpoint
-CREATE TABLE `brokerages` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`client_id` integer NOT NULL,
-	`month` integer NOT NULL,
-	`year` integer NOT NULL,
-	`calculation_period` integer NOT NULL,
-	`brokerage_rate` real DEFAULT 10 NOT NULL,
-	`total_days_in_month` integer NOT NULL,
-	`total_holding_value` real NOT NULL,
-	`total_holding_days` integer NOT NULL,
-	`brokerage_amount` real NOT NULL,
-	`is_paid` integer DEFAULT 0 NOT NULL,
-	`paid_amount` real DEFAULT 0,
-	`total_positions` integer NOT NULL,
-	`calculated_at` integer NOT NULL,
-	`created_at` integer NOT NULL,
-	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `period_idx` ON `brokerages` (`calculation_period`);--> statement-breakpoint
-CREATE UNIQUE INDEX `brokerages_client_id_calculation_period_unique` ON `brokerages` (`client_id`,`calculation_period`);--> statement-breakpoint
 CREATE TABLE `clients` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
@@ -74,6 +34,55 @@ CREATE TABLE `clients` (
 CREATE UNIQUE INDEX `clients_pan_unique` ON `clients` (`pan`);--> statement-breakpoint
 CREATE UNIQUE INDEX `clients_email_unique` ON `clients` (`email`);--> statement-breakpoint
 CREATE UNIQUE INDEX `clients_mobile_unique` ON `clients` (`mobile`);--> statement-breakpoint
+CREATE TABLE `cron_job_executions` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`job_id` integer NOT NULL,
+	`started_at` integer NOT NULL,
+	`finished_at` integer,
+	`status` text NOT NULL,
+	`execution_time_ms` integer,
+	`error` text,
+	`logs` text,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`job_id`) REFERENCES `cron_jobs`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `job_execution_idx` ON `cron_job_executions` (`job_id`,`started_at`);--> statement-breakpoint
+CREATE TABLE `cron_jobs` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`description` text,
+	`schedule` text NOT NULL,
+	`is_active` integer DEFAULT 1 NOT NULL,
+	`last_run_at` integer,
+	`next_run_at` integer,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `cron_jobs_name_unique` ON `cron_jobs` (`name`);--> statement-breakpoint
+CREATE TABLE `daily_brokerage` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`client_id` integer NOT NULL,
+	`date` integer NOT NULL,
+	`holding_amount` real DEFAULT 0 NOT NULL,
+	`unused_amount` real DEFAULT 0 NOT NULL,
+	`daily_rate` real,
+	`daily_holding_rate` real NOT NULL,
+	`daily_unused_rate` real NOT NULL,
+	`days_in_quarter` integer DEFAULT 90 NOT NULL,
+	`holding_brokerage` real NOT NULL,
+	`unused_brokerage` real NOT NULL,
+	`total_daily_brokerage` real NOT NULL,
+	`holding_positions_count` integer NOT NULL,
+	`unused_transactions_count` integer NOT NULL,
+	`notes` text,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `daily_client_date_idx` ON `daily_brokerage` (`client_id`,`date`);--> statement-breakpoint
+CREATE UNIQUE INDEX `daily_brokerage_client_id_date_unique` ON `daily_brokerage` (`client_id`,`date`);--> statement-breakpoint
 CREATE TABLE `fifo_allocations` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`sell_trade_id` integer NOT NULL,
@@ -106,18 +115,16 @@ CREATE TABLE `payments` (
 	`payment_type` text DEFAULT 'other' NOT NULL,
 	`description` text,
 	`payment_date` integer NOT NULL,
-	`brokerage_id` integer,
 	`notes` text,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`brokerage_id`) REFERENCES `brokerages`(`id`) ON UPDATE no action ON DELETE set null
+	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `payment_client_date_idx` ON `payments` (`client_id`,`payment_date`);--> statement-breakpoint
 CREATE TABLE `stocks` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`symbol` text NOT NULL,
-	`name` text NOT NULL,
+	`name` text,
 	`exchange` text NOT NULL,
 	`sector` text,
 	`current_price` real DEFAULT 0,
@@ -140,8 +147,8 @@ CREATE TABLE `trades` (
 	`remaining_quantity` integer NOT NULL,
 	`is_fully_sold` integer DEFAULT 0 NOT NULL,
 	`sell_processed` integer DEFAULT 0 NOT NULL,
-	`last_brokerage_calculated` integer,
 	`notes` text,
+	`brokerage_calculated_date` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
@@ -149,4 +156,21 @@ CREATE TABLE `trades` (
 --> statement-breakpoint
 CREATE INDEX `client_symbol_idx` ON `trades` (`client_id`,`symbol`,`exchange`);--> statement-breakpoint
 CREATE INDEX `trade_date_idx` ON `trades` (`trade_date`);--> statement-breakpoint
-CREATE INDEX `fifo_idx` ON `trades` (`type`,`is_fully_sold`,`trade_date`);
+CREATE INDEX `fifo_idx` ON `trades` (`type`,`is_fully_sold`,`trade_date`);--> statement-breakpoint
+CREATE TABLE `unused_amounts` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`client_id` integer NOT NULL,
+	`source_trade_id` integer NOT NULL,
+	`amount` real NOT NULL,
+	`remaining_amount` real NOT NULL,
+	`start_date` integer NOT NULL,
+	`end_date` integer,
+	`last_brokerage_date` integer,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`source_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE INDEX `unused_client_idx` ON `unused_amounts` (`client_id`);--> statement-breakpoint
+CREATE INDEX `unused_active_idx` ON `unused_amounts` (`client_id`) WHERE "unused_amounts"."end_date" is null;

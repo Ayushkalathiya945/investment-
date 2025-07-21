@@ -77,8 +77,8 @@ export async function getFifoAllocationsByDateRange(
     return getDB(tx).select().from(fifoAllocations).where(
         and(
             eq(fifoAllocations.clientId, clientId),
-            gte(fifoAllocations.sellDate, startDate),
-            lte(fifoAllocations.sellDate, endDate),
+            gte(fifoAllocations.sellDate, new Date(startDate)),
+            lte(fifoAllocations.sellDate, new Date(endDate)),
         ),
     );
 }

@@ -1,126 +1,147 @@
 import type {
-    BrokerageCalculateRequest,
-    BrokerageCalculateResponse,
     BrokerageFilterRequest,
-    BrokerageItem,
+    BrokerageResponseType,
 } from "@/types/brokerage";
 
+import { PAGE_LIMIT } from "@/lib/constants";
 import { PeriodType } from "@/types/brokerage";
 
 import { ApiPost } from "./api-helper";
 
-export async function calculateBrokerage(data: BrokerageCalculateRequest): Promise<BrokerageCalculateResponse> {
+/**
+ * Fetches brokerage records with the given filters
+ */
+async function getBrokerageRecords(filters: BrokerageFilterRequest) {
     try {
-        return await ApiPost<BrokerageCalculateResponse>("/brokerage/calculate", data as unknown as Record<string, unknown>);
-    } catch (error: any) {
-        console.error("Error calculating brokerage:", error);
-        throw new Error(error.message || "Failed to calculate brokerage");
-    }
-}
+        const {
+            page = 1,
+            limit = 15,
+            periodType = PeriodType.DAILY,
+            clientId,
+            // Daily filters
+            startDate,
+            endDate,
+            // Monthly filters
+            startMonth,
+            startYear,
+            endMonth,
+            endYear,
+            // Quarterly filters
+            quarter,
+            quarterYear,
+            // Generic date range filters
+            from,
+            to,
+        } = filters;
 
-export async function getBrokerageRecords(filters: BrokerageFilterRequest): Promise<{
-    success: boolean;
-    data: BrokerageItem[];
-    periodType: PeriodType;
-    metadata: {
-        total: number;
-        hasNext: boolean;
-        totalPages: number;
-        currentPage: number;
-    };
-}> {
-    // console.log(`Fetching brokerage records with filters:`, filters);
+        // console.log("Inside getBrokerageRecords with filters: ", filters);
 
-    try {
-        // Determine period type based on provided filters
-        let periodType = PeriodType.MONTH;
-        if (filters.quarter) {
-            periodType = PeriodType.QUARTER;
-        } else if (filters.from && filters.to && !filters.month) {
-            periodType = PeriodType.CUSTOM;
-        }
-
-        const response = await ApiPost<{
-            success: boolean;
-            data: BrokerageItem[];
-            periodType: PeriodType;
-            metadata: {
-                total: number;
-                hasNext: boolean;
-                totalPages: number;
-                currentPage: number;
-            };
-        }>("/brokerage/get-all", {
-            ...filters,
+        const response = await ApiPost<BrokerageResponseType>("/brokerage/get-all", {
+            page,
+            limit,
             periodType,
-        } as unknown as Record<string, unknown>);
+            clientId,
+            startDate,
+            endDate,
+            startMonth,
+            startYear,
+            endMonth,
+            endYear,
+            quarter,
+            quarterYear,
+            from,
+            to,
+        });
 
         return response;
     } catch (error) {
         console.error("Error fetching brokerage records:", error);
-        throw new Error(`${error}` || "Failed to fetch brokerage records");
+        throw new Error("Failed to fetch brokerage records");
     }
 }
 
-export async function getAllPeriodicBrokerage(
-    periodType: PeriodType = PeriodType.MONTH,
+/**
+ * Fetches brokerage data for a specific period
+ */
+export async function getPeriodicBrokerage(
+    periodType: PeriodType = PeriodType.MONTHLY,
     period?: number,
     year?: number,
     page: number = 1,
-    limit: number = 20,
-): Promise<{
-        success: boolean;
-        data: BrokerageItem[];
-        periodType: PeriodType;
-        metadata?: {
-            total: number;
-            hasNext: boolean;
-            totalPages: number;
-            currentPage: number;
-        };
-    }> {
+    limit: number = PAGE_LIMIT,
+    quarter?: number,
+    quarterYear?: number,
+    startMonth?: number,
+    startYear?: number,
+    endMonth?: number,
+    endYear?: number,
+    startDate?: string | Date,
+    endDate?: string | Date,
+    from?: string | Date,
+    to?: string | Date,
+) {
+    const filters: BrokerageFilterRequest = {
+        page,
+        limit,
+        periodType,
+        // Use the parameters passed from the UI
+        quarter,
+        quarterYear,
+        startMonth,
+        startYear,
+        endMonth,
+        endYear,
+        startDate: startDate ? (typeof startDate === "string" ? startDate : startDate.toISOString().split("T")[0]) : undefined,
+        endDate: endDate ? (typeof endDate === "string" ? endDate : endDate.toISOString().split("T")[0]) : undefined,
+        from,
+        to,
+    };
+
+    // Fallback logic for backward compatibility with period/year parameters
+    if (period !== undefined && !quarter && !startMonth && !from) {
+        switch (periodType) {
+            case PeriodType.QUARTERLY:
+                if (period >= 1 && period <= 4) {
+                    filters.quarter = period;
+                    if (year)
+                        filters.quarterYear = year;
+                }
+                break;
+            case PeriodType.MONTHLY:
+                if (period >= 1 && period <= 12) {
+                    filters.startMonth = period;
+                    filters.endMonth = period;
+                    if (year) {
+                        filters.startYear = year;
+                        filters.endYear = year;
+                    }
+                }
+                break;
+            case PeriodType.DAILY:
+                // For daily, we can use startDate/endDate or generic from/to
+                if (year) {
+                    const month = new Date().getMonth() + 1; // Default to current month
+                    const startDate = new Date(year, month - 1, period);
+                    const endDate = new Date(year, month - 1, period);
+                    filters.startDate = startDate.toISOString().split("T")[0];
+                    filters.endDate = endDate.toISOString().split("T")[0];
+                }
+                break;
+        }
+    }
+
     try {
-        // Create a filter object based on period type
-        const filters: BrokerageFilterRequest = {
-            page,
-            limit,
-        };
+        // console.log("Fetching periodic brokerage with filters:", filters);
 
-        // Add period-specific filters (quarter or month) based on periodType
-        if (period) {
-            if (periodType === PeriodType.QUARTER) {
-                filters.quarter = period;
-            } else if (periodType === PeriodType.MONTH) {
-                filters.month = period;
-            }
-        }
-
-        // Add year filter if provided
-        if (year) {
-            filters.year = year;
-        }
-
-        // console.log(`Fetching periodic brokerage with filters:`, filters);
-
-        // Use the existing getBrokerageRecords function which calls the /get-all endpoint
         const response = await getBrokerageRecords(filters);
-
-        // Return the response
         return {
             success: response.success,
             data: response.data || [],
             periodType,
             metadata: response.metadata,
         };
-    } catch (error: any) {
-        console.error("Error fetching periodic brokerage records:", error);
-        console.error("Parameters:", { periodType, period, year });
-
-        // Return empty success response instead of throwing
-        return {
-            success: false,
-            data: [],
-            periodType,
-        };
+    } catch (error) {
+        console.error("Error fetching periodic brokerage:", { periodType, period, year, error });
+        return { success: false, data: [], periodType };
     }
 }

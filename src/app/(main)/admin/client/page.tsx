@@ -169,7 +169,7 @@ const Client: React.FC = () => {
     }, [clientsError, analyticsError]);
 
     const handleDateChange = (date: DateRange) => {
-        console.log("handleDateChange received:", date);
+        // console.log("handleDateChange received:", date);
 
         if (date?.from && date?.to) {
             // Create new Date objects to avoid mutating the original dates
@@ -180,15 +180,15 @@ const Client: React.FC = () => {
             const endDate = new Date(date.to);
             endDate.setHours(23, 59, 59, 999);
 
-            console.log("Setting date range:", {
-                from: startDate.toDateString(),
-                to: endDate.toDateString(),
-            });
+            // console.log("Setting date range:", {
+            //     from: startDate.toDateString(),
+            //     to: endDate.toDateString(),
+            // });
 
             setDateRange({ from: startDate, to: endDate });
         } else {
             // Clear date range completely when either date is undefined
-            console.log("Clearing date range");
+            // console.log("Clearing date range");
             setDateRange(undefined);
         }
 
@@ -207,7 +207,7 @@ const Client: React.FC = () => {
     const analytics = {
         totalClient: analyticsResponse?.data?.totalClient || 0,
         totalTradeAmount: analyticsResponse?.data.totalValue || 0,
-        totalBrokerageAmount: analyticsResponse?.data.totalBrokerage || 0,
+        totalFeesAmount: analyticsResponse?.data.totalFees || 0,
         totalPaymentAmount: analyticsResponse?.data.totalPayment || 0,
         remainingPurseAmount: analyticsResponse?.data.remainingPurseAmount || 0,
     };
@@ -236,19 +236,35 @@ const Client: React.FC = () => {
                 />
                 <StatCard
                     icon={<IndianRupee />}
-                    value={typeof analytics.totalTradeAmount === "number" ? `₹${analytics.totalTradeAmount.toLocaleString("en-IN")}` : "₹0"}
+                    value={typeof analytics.totalTradeAmount === "number"
+                        ? `₹${analytics.totalTradeAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
+                        : "₹0"}
                     label="Total Value"
                     isLoading={isLoadingAnalytics}
                 />
                 <StatCard
                     icon={<TrendingUp />}
-                    value={typeof analytics.totalBrokerageAmount === "number" ? `₹${analytics.totalBrokerageAmount.toLocaleString("en-IN")}` : "₹0"}
+                    value={typeof analytics.totalFeesAmount === "number"
+                        ? `₹${analytics.totalFeesAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })
+                        }`
+                        : "₹0"}
                     label="Total fees"
                     isLoading={isLoadingAnalytics}
                 />
                 <StatCard
                     icon={<TrendingDown />}
-                    value={typeof analytics.totalPaymentAmount === "number" ? `₹${analytics.totalPaymentAmount.toLocaleString("en-IN")}` : "₹0"}
+                    value={typeof analytics.totalPaymentAmount === "number"
+                        ? `₹${analytics.totalPaymentAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
+                        : "₹0"}
                     label="Payments Received"
                     isLoading={isLoadingAnalytics}
                 />

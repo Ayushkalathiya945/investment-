@@ -206,7 +206,7 @@ const PaymentHistory: React.FC = () => {
 
                 setDateRange({ from: startDate, to: endDate });
             } else {
-                console.error("Clearing date range");
+                // console.error("Clearing date range");
                 setDateRange(undefined);
             }
 

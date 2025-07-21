@@ -64,7 +64,7 @@ const AddClient: React.FC<AddClientProps> = ({
             mobileNo: "",
             email: "",
             address: "",
-            purseAmount: undefined,
+            purseAmount: 0, // Changed from undefined to 0 to ensure it's always a number
         },
         resolver: zodResolver(addClientSchema),
         mode: "onSubmit",
@@ -80,6 +80,7 @@ const AddClient: React.FC<AddClientProps> = ({
 
             queryClient.invalidateQueries({ queryKey: ["clients"] });
             queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
+            queryClient.invalidateQueries({ queryKey: ["clientsDropdown"] });
 
             if (onSuccess)
                 onSuccess();
@@ -98,6 +99,7 @@ const AddClient: React.FC<AddClientProps> = ({
             queryClient.invalidateQueries({ queryKey: ["clients"] });
             queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
             queryClient.invalidateQueries({ queryKey: ["client"] });
+            queryClient.invalidateQueries({ queryKey: ["clientsDropdown"] });
 
             if (onSuccess)
                 onSuccess();

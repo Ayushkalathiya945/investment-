@@ -7,26 +7,34 @@ export type StockSymbolsResponse = {
     };
 };
 
+export enum TradeType {
+    BUY = "BUY",
+    SELL = "SELL",
+}
+
+export enum ExchangeType {
+    NSE = "NSE",
+    BSE = "BSE",
+}
+
 export type Trade = {
     id: number;
     clientId: number;
     clientName: string;
     symbol: string;
-    exchange: "NSE" | "BSE";
-    type: "BUY" | "SELL";
+    exchange: ExchangeType;
+    type: TradeType;
     quantity: number;
     price: number;
-    tradeDate: string | Date | number;
-    createdAt: string | Date;
-    updatedAt: string | Date;
-    status: "PENDING" | "COMPLETED" | "CANCELLED";
+    tradeDate: Date;
+    netAmount: number;
+    originalQuantity: number;
+    remainingQuantity: number;
+    isFullySold: number;
+    sellProcessed: number;
     notes?: string;
-    isFullySold?: number;
-    lastBrokerageCalculated?: string | null;
-    netAmount?: number;
-    originalQuantity?: number;
-    remainingQuantity?: number;
-    sellProcessed?: number;
+    createdAt: Date;
+    updatedAt: Date;
 };
 
 export type TradeResponse = {

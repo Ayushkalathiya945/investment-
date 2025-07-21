@@ -49,9 +49,9 @@ export async function findAllWithPagination(data: { page: number; limit: number;
     if (data.clientId)
         conditions.push(eq(trades.clientId, data.clientId));
     if (data.From)
-        conditions.push(gte(trades.tradeDate, data.From));
+        conditions.push(gte(trades.tradeDate, new Date(data.From)));
     if (data.To)
-        conditions.push(lte(trades.tradeDate, data.To));
+        conditions.push(lte(trades.tradeDate, new Date(data.To)));
 
     const tradesData = await getDB(tx).query.trades.findMany({
         where: and(...conditions),
@@ -89,9 +89,9 @@ export async function calculateTotalTradeAmount(data: { clientId?: number; from?
     if (data.clientId)
         conditions.push(eq(trades.clientId, data.clientId));
     if (data.from)
-        conditions.push(gte(trades.tradeDate, data.from));
+        conditions.push(gte(trades.tradeDate, new Date(data.from)));
     if (data.to)
-        conditions.push(lte(trades.tradeDate, data.to));
+        conditions.push(lte(trades.tradeDate, new Date(data.to)));
 
     if (conditions.length === 0)
         return 0;
@@ -116,9 +116,9 @@ export async function calculateTotalSoldAmount(data: { clientId?: number; from?:
 
     // Add date range conditions if provided
     if (data.from)
-        conditions.push(gte(trades.tradeDate, data.from));
+        conditions.push(gte(trades.tradeDate, new Date(data.from)));
     if (data.to)
-        conditions.push(lte(trades.tradeDate, data.to));
+        conditions.push(lte(trades.tradeDate, new Date(data.to)));
 
     if (conditions.length === 0)
         return 0;
@@ -135,7 +135,7 @@ export async function calculateTotalSoldAmount(data: { clientId?: number; from?:
 export async function findBuyTradesWithRemainingQuantity(data: {
     clientId: number;
     symbol: string;
-    exchange: string;
+    exchange: "NSE" | "BSE";
     tradeDate: number;
 }, tx?: TransactionType) {
     return getDB(tx).query.trades.findMany({
@@ -145,7 +145,7 @@ export async function findBuyTradesWithRemainingQuantity(data: {
             eq(trades.exchange, data.exchange),
             eq(trades.type, TradeType.BUY),
             eq(trades.isFullySold, 0),
-            lte(trades.tradeDate, data.tradeDate),
+            lte(trades.tradeDate, new Date(data.tradeDate)),
         ),
         orderBy: [trades.tradeDate],
     });
@@ -175,8 +175,8 @@ export async function getTradesByDateRange(
     return getDB(tx).query.trades.findMany({
         where: and(
             eq(trades.clientId, clientId),
-            gte(trades.tradeDate, startDate),
-            lte(trades.tradeDate, endDate),
+            gte(trades.tradeDate, new Date(startDate)),
+            lte(trades.tradeDate, new Date(endDate)),
         ),
     });
 }
