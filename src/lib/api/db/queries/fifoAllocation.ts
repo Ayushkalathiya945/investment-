@@ -28,10 +28,16 @@ export async function findBySellTradeId(sellTradeId: number, tx?: TransactionTyp
  * Find FIFO allocations by buy trade ID
  */
 export async function findByBuyTradeId(buyTradeId: number, tx?: TransactionType) {
-    return getDB(tx).query.fifoAllocations.findMany({
-        where: eq(fifoAllocations.buyTradeId, buyTradeId),
-        orderBy: [desc(fifoAllocations.createdAt)],
-    });
+    const db = getDB(tx);
+    return await db.select().from(fifoAllocations).where(eq(fifoAllocations.buyTradeId, buyTradeId));
+}
+
+/**
+ * Delete FIFO allocations by sell trade ID
+ */
+export async function deleteBySellTradeId(sellTradeId: number, tx?: TransactionType) {
+    const db = getDB(tx);
+    await db.delete(fifoAllocations).where(eq(fifoAllocations.sellTradeId, sellTradeId));
 }
 
 /**

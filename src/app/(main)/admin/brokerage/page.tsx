@@ -124,7 +124,7 @@ const Brokerage: React.FC = () => {
         const now = new Date();
         return {
             from: startOfMonth(new Date(now.getFullYear(), 0, 1)),
-            to: endOfMonth(addMonths(new Date(now.getFullYear(), 0, 1), now.getMonth() - 1)),
+            to: endOfMonth(addMonths(new Date(now.getFullYear(), 0, 1), now.getMonth())),
         };
     });
     const [selectedMonthYear, setSelectedMonthYear] = useState<number>(() => {
@@ -343,7 +343,7 @@ const Brokerage: React.FC = () => {
             });
             setSelectedMonthYear(new Date().getFullYear());
         } else if (newPeriodType === "QUARTERLY") {
-            setSelectedQuarter(1);
+            setSelectedQuarter(_getQuarterFromDate(new Date()));
             setSelectedQuarterYear(new Date().getFullYear());
         }
     };

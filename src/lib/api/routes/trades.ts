@@ -6,10 +6,12 @@ import type { TransactionType } from "../db";
 import type { ExchangeType, NewFifoAllocation, NewTrade, Trade } from "../db/schema";
 
 import { getDB } from "../db";
+import * as amountUsageQueries from "../db/queries/amountUsage";
 import * as clientQueries from "../db/queries/client";
 import * as fifoQueries from "../db/queries/fifoAllocation";
 import * as stockQueries from "../db/queries/stock";
 import * as tradeQueries from "../db/queries/trade";
+import * as unusedAmountQueries from "../db/queries/unusedAmount";
 import { TradeType } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { tradeFilterSchema, tradeGetOneSchema, tradeSchema, updateTradeSchema } from "../utils/validation-schemas";
@@ -298,10 +300,53 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
             if (tradeData.type === TradeType.BUY) {
                 // For BUY trades, the FIFO fields are already set
                 await processBuyTrade(trade, tx);
+
+                let amountToCover = trade.netAmount;
+                const activeUnusedAmounts = await unusedAmountQueries.getActive(trade.clientId, tx);
+
+                for (const unused of activeUnusedAmounts) {
+                    if (amountToCover <= 0)
+                        break;
+
+                    const amountToUse = Math.min(amountToCover, unused.remainingAmount);
+
+                    await amountUsageQueries.create(
+                        {
+                            unusedAmountId: unused.id,
+                            buyTradeId: trade.id,
+                            amountUsed: amountToUse,
+                            usageDate: new Date(trade.tradeDate),
+                        },
+                        tx,
+                    );
+
+                    const newRemainingAmount = unused.remainingAmount - amountToUse;
+                    const updates: any = { remainingAmount: newRemainingAmount };
+
+                    if (newRemainingAmount <= 0) {
+                        updates.endDate = new Date(trade.tradeDate);
+                    }
+
+                    await unusedAmountQueries.updateById(unused.id, updates, tx);
+
+                    amountToCover -= amountToUse;
+                }
             } else if (tradeData.type === TradeType.SELL) {
                 // console.log("Processing sell trade with data:", tradeData);
                 // Process sell trade - create FIFO allocations
                 await processSellTrade(trade, tx);
+
+                await unusedAmountQueries.create(
+                    {
+                        clientId: trade.clientId,
+                        sourceTradeId: trade.id,
+                        amount: trade.netAmount,
+                        remainingAmount: trade.netAmount,
+                        startDate: new Date(trade.tradeDate),
+                        lastBrokerageDate: new Date(trade.tradeDate),
+                    },
+                    tx,
+                );
             }
 
             return c.json({
@@ -336,7 +381,7 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
                 _errorStatus = 404;
             } else if (error.message.includes("brokerage has already been calculated")
                 || error.message.includes("brokerage calculation first")) {
-                errorMessage = "Cannot create trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                errorMessage = "Cannot create trade as brokerage has already been calculated.";
                 _errorStatus = 409;
             }
         }
@@ -351,56 +396,363 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
 });
 
 /**
- * Reverse a trade's effects on FIFO allocations
+ * Reverse a trade's effects on FIFO allocations with special handling for updates
+ * This version allows unused amount modifications but blocks for insufficient stocks
  */
-async function reverseTrade(
+async function reverseTradeForUpdate(
     trade: Trade,
     tx?: TransactionType,
 ): Promise<void> {
-    // Note: Brokerage validation removed as fields don't exist in current schema
-
     if (trade.type === TradeType.BUY) {
-        // For a BUY trade, we need to check if any of the shares have been sold
+        // For a BUY trade, check if any shares have been sold.
         const allocations = await fifoQueries.findByBuyTradeId(trade.id, tx);
-
         if (allocations.length > 0) {
             throw new HTTPException(400, {
-                message: "Cannot update this trade as some shares from this purchase have already been sold",
+                message: "Cannot modify this trade as some shares from this purchase have already been sold.",
             });
         }
 
-        // No allocations means the BUY trade hasn't been used yet, so we can just delete it
-        // The delete happens elsewhere, nothing to do here
+        // Reverse any amount usages related to this BUY trade.
+        // For updates, we allow this even if it causes unused amount issues
+        const usages = await amountUsageQueries.findByBuyTrade(trade.id, tx);
+        for (const usage of usages) {
+            try {
+                await unusedAmountQueries.restoreAmount(usage.unusedAmountId, usage.amountUsed, tx);
+            } catch (error) {
+                // Log the error but don't block the update for unused amount issues
+                console.warn(`Warning: Could not restore unused amount for trade ${trade.id}:`, error);
+            }
+        }
+        await amountUsageQueries.deleteByBuyTrade(trade.id, tx);
     } else if (trade.type === TradeType.SELL) {
-        // For a SELL trade, we need to reverse the FIFO allocations and restore quantities to BUY trades
+        // For a SELL trade, reverse FIFO allocations and restore quantities to BUY trades.
         const allocations = await fifoQueries.findBySellTradeId(trade.id, tx);
 
         for (const allocation of allocations) {
-            // Get the buy trade
             const buyTrade = await tradeQueries.findOne({ id: allocation.buyTradeId }, tx);
             if (!buyTrade) {
                 throw new HTTPException(404, { message: `Buy trade not found for allocation ${allocation.id}` });
             }
 
-            // Note: Brokerage validation removed as field doesn't exist in current schema
-
-            // Restore shares to the buy trade
+            // Restore shares to the buy trade.
             const newRemainingQty = buyTrade.remainingQuantity + allocation.quantityAllocated;
-
-            // Update the buy trade
             await tradeQueries.update(
                 {
                     id: buyTrade.id,
                     remainingQuantity: newRemainingQty,
-                    isFullySold: 0, // No longer fully sold since we're adding quantity back
+                    isFullySold: 0, // No longer fully sold.
                 },
                 tx,
             );
         }
 
-        // Delete the FIFO allocations (this would be handled via database cascade delete when deleting the SELL trade)
+        // Explicitly delete the FIFO allocations for this sell trade.
+        if (allocations.length > 0) {
+            await fifoQueries.deleteBySellTradeId(trade.id, tx);
+        }
+
+        // Handle the unused amount created by this SELL trade.
+        // For updates, we need to carefully manage used proceeds
+        const unusedRecord = await unusedAmountQueries.findBySourceTrade(trade.id, tx);
+        if (unusedRecord) {
+            const amountUsed = unusedRecord.amount - unusedRecord.remainingAmount;
+            if (amountUsed > 0) {
+                // Store the usage information for later adjustment
+                console.warn(`Warning: Modifying trade ${trade.id} with partially used proceeds. Amount used: ${amountUsed}`);
+                // We'll handle the adjustment in the update process, not delete here
+            } else {
+                // If no amount has been used, we can safely delete and recreate
+                await unusedAmountQueries.deleteBySourceTrade(trade.id, tx);
+            }
+        }
     }
 }
+
+/**
+ * Recalculate amount usage for a BUY trade after update
+ * This ensures the used/unused amount tables are properly updated
+ */
+async function recalculateAmountUsageForBuyTrade(
+    buyTrade: Trade,
+    tx?: TransactionType,
+): Promise<void> {
+    const { clientId, netAmount } = buyTrade;
+
+    // Get available unused amounts for this client, ordered by oldest first (FIFO)
+    const availableUnusedAmounts = await unusedAmountQueries.getActive(clientId, tx);
+
+    let remainingAmountNeeded = netAmount;
+
+    for (const unusedAmount of availableUnusedAmounts) {
+        if (remainingAmountNeeded <= 0)
+            break;
+
+        const amountToUse = Math.min(remainingAmountNeeded, unusedAmount.remainingAmount);
+
+        if (amountToUse > 0) {
+            // Create amount usage record
+            await amountUsageQueries.create({
+                unusedAmountId: unusedAmount.id,
+                buyTradeId: buyTrade.id,
+                amountUsed: amountToUse,
+                usageDate: new Date(),
+            }, tx);
+
+            // Update the unused amount record
+            await unusedAmountQueries.updateById(
+                unusedAmount.id,
+                {
+                    remainingAmount: unusedAmount.remainingAmount - amountToUse,
+                    endDate: unusedAmount.remainingAmount - amountToUse <= 0 ? new Date() : null,
+                },
+                tx,
+            );
+
+            remainingAmountNeeded -= amountToUse;
+        }
+    }
+
+    // If there's still remaining amount needed, it means insufficient unused amounts
+    // But for updates, we allow this and log a warning
+    if (remainingAmountNeeded > 0) {
+        console.warn(`Warning: Insufficient unused amounts for trade ${buyTrade.id}. Remaining needed: ${remainingAmountNeeded}`);
+    }
+}
+
+/**
+ * Handle updating a SELL trade when its proceeds have already been used
+ * This function carefully adjusts the unused amount and all dependent amount usage records
+ */
+async function handleUsedProceedsUpdate(
+    existingUnusedRecord: any,
+    newNetAmount: number,
+    amountUsed: number,
+    tx?: TransactionType,
+): Promise<void> {
+    const originalAmount = existingUnusedRecord.amount;
+
+    if (newNetAmount < amountUsed) {
+        // New amount is less than what's already been used - this is problematic
+        // We need to proportionally reduce all amount usage records
+        const usageRecords = await amountUsageQueries.findByUnusedAmount(existingUnusedRecord.id, tx);
+
+        let totalReduction = amountUsed - newNetAmount;
+
+        // Proportionally reduce each usage record
+        for (const usage of usageRecords) {
+            if (totalReduction <= 0)
+                break;
+
+            const reductionForThisUsage = Math.min(usage.amountUsed, totalReduction);
+            const newAmountUsed = usage.amountUsed - reductionForThisUsage;
+
+            if (newAmountUsed > 0) {
+                // Update the usage record with reduced amount
+                await amountUsageQueries.updateById(usage.id, {
+                    amountUsed: newAmountUsed,
+                }, tx);
+            } else {
+                // Delete the usage record if it becomes zero
+                await amountUsageQueries.deleteById(usage.id, tx);
+            }
+
+            totalReduction -= reductionForThisUsage;
+        }
+
+        // Update the unused amount record
+        await unusedAmountQueries.updateById(
+            existingUnusedRecord.id,
+            {
+                amount: newNetAmount,
+                remainingAmount: 0, // All of the new amount is considered used
+                endDate: new Date(), // Mark as fully used
+            },
+            tx,
+        );
+    } else if (newNetAmount > originalAmount) {
+        // New amount is greater - we have more proceeds available
+        const additionalAmount = newNetAmount - originalAmount;
+        const newRemainingAmount = existingUnusedRecord.remainingAmount + additionalAmount;
+
+        // Update the unused amount record
+        await unusedAmountQueries.updateById(
+            existingUnusedRecord.id,
+            {
+                amount: newNetAmount,
+                remainingAmount: newRemainingAmount,
+                endDate: newRemainingAmount > 0 ? null : existingUnusedRecord.endDate,
+            },
+            tx,
+        );
+    } else {
+        // Same amount - just update the record to refresh any other fields
+        await unusedAmountQueries.updateById(
+            existingUnusedRecord.id,
+            {
+                amount: newNetAmount,
+                // remainingAmount stays the same
+            },
+            tx,
+        );
+    }
+}
+
+/**
+ * Create or update unused amount record for a SELL trade after update
+ * Handles cases where proceeds have already been used
+ */
+async function createUnusedAmountForSellTrade(
+    sellTrade: Trade,
+    tx?: TransactionType,
+): Promise<void> {
+    const { clientId, netAmount, id: tradeId, tradeDate } = sellTrade;
+
+    // Check if there's already an unused amount record for this trade
+    const existingUnusedRecord = await unusedAmountQueries.findBySourceTrade(tradeId, tx);
+
+    if (existingUnusedRecord) {
+        // Calculate how much has been used from the original amount
+        const originalAmount = existingUnusedRecord.amount;
+        const amountUsed = originalAmount - existingUnusedRecord.remainingAmount;
+
+        if (amountUsed > 0) {
+            // Proceeds have been used - we need to adjust carefully
+            await handleUsedProceedsUpdate(existingUnusedRecord, netAmount, amountUsed, tx);
+        } else {
+            // No amount has been used - simple update
+            await unusedAmountQueries.updateById(
+                existingUnusedRecord.id,
+                {
+                    amount: netAmount,
+                    remainingAmount: netAmount,
+                    startDate: tradeDate,
+                },
+                tx,
+            );
+        }
+    } else {
+        // No existing record - create new one
+        await unusedAmountQueries.create({
+            clientId,
+            sourceTradeId: tradeId,
+            amount: netAmount,
+            remainingAmount: netAmount,
+            startDate: tradeDate,
+            endDate: null, // Will be set when fully used
+        }, tx);
+    }
+}
+
+/**
+ * Reverse a trade's effects on FIFO allocations (original strict version)
+ */
+async function reverseTrade(
+    trade: Trade,
+    tx?: TransactionType,
+): Promise<void> {
+    if (trade.type === TradeType.BUY) {
+        // For a BUY trade, check if any shares have been sold.
+        const allocations = await fifoQueries.findByBuyTradeId(trade.id, tx);
+        if (allocations.length > 0) {
+            throw new HTTPException(400, {
+                message: "Cannot modify this trade as some shares from this purchase have already been sold.",
+            });
+        }
+
+        // Reverse any amount usages related to this BUY trade.
+        const usages = await amountUsageQueries.findByBuyTrade(trade.id, tx);
+        for (const usage of usages) {
+            await unusedAmountQueries.restoreAmount(usage.unusedAmountId, usage.amountUsed, tx);
+        }
+        await amountUsageQueries.deleteByBuyTrade(trade.id, tx);
+    } else if (trade.type === TradeType.SELL) {
+        // For a SELL trade, reverse FIFO allocations and restore quantities to BUY trades.
+        const allocations = await fifoQueries.findBySellTradeId(trade.id, tx);
+
+        for (const allocation of allocations) {
+            const buyTrade = await tradeQueries.findOne({ id: allocation.buyTradeId }, tx);
+            if (!buyTrade) {
+                throw new HTTPException(404, { message: `Buy trade not found for allocation ${allocation.id}` });
+            }
+
+            // Restore shares to the buy trade.
+            const newRemainingQty = buyTrade.remainingQuantity + allocation.quantityAllocated;
+            await tradeQueries.update(
+                {
+                    id: buyTrade.id,
+                    remainingQuantity: newRemainingQty,
+                    isFullySold: 0, // No longer fully sold.
+                },
+                tx,
+            );
+        }
+
+        // Explicitly delete the FIFO allocations for this sell trade.
+        if (allocations.length > 0) {
+            await fifoQueries.deleteBySellTradeId(trade.id, tx);
+        }
+
+        // Reverse the unused amount created by this SELL trade.
+        const unusedRecord = await unusedAmountQueries.findBySourceTrade(trade.id, tx);
+        if (unusedRecord) {
+            const amountUsed = unusedRecord.amount - unusedRecord.remainingAmount;
+            if (amountUsed > 0) {
+                throw new HTTPException(400, {
+                    message:
+                        "Cannot modify trade because the proceeds from this sale have already been partially used. Please reverse the dependent trades first.",
+                });
+            }
+            await unusedAmountQueries.deleteBySourceTrade(trade.id, tx);
+        }
+    }
+}
+
+tradeRouter.delete("/delete/:id", zValidator("param", tradeGetOneSchema), async (c) => {
+    const id = c.req.valid("param").id as number;
+
+    try {
+        // Check if trade exists
+        const trade = await tradeQueries.findOne({ id });
+        if (!trade) {
+            throw new HTTPException(404, { message: "Trade not found" });
+        }
+
+        // Use a transaction for all database operations to ensure consistency
+        const db = getDB();
+        await db.transaction(async (tx: TransactionType) => {
+            // Reverse the effects of the trade first
+            await reverseTrade(trade, tx);
+
+            // Then delete the trade
+            await tradeQueries.remove(id, tx);
+        });
+
+        return c.json({
+            success: true,
+            message: "Trade deleted successfully",
+        });
+    } catch (error: any) {
+        console.error("Trade deletion error:", error);
+
+        let errorMessage = "Failed to delete trade. Please try again later.";
+        let errorStatus = 500;
+
+        if (error instanceof HTTPException) {
+            errorMessage = error.message || errorMessage;
+            errorStatus = error.status;
+        } else if (error && typeof error === "object" && error.message) {
+            errorMessage = error.message;
+            if (error.message.includes("already been sold")) {
+                errorStatus = 400;
+            } else if (error.message.includes("proceeds from this sale have already been partially used")) {
+                errorMessage = "Cannot delete trade because the proceeds from this sale have been used. Please reverse dependent trades first.";
+                errorStatus = 400;
+            }
+        }
+
+        return c.json({ success: false, message: errorMessage, error: errorMessage }, errorStatus as any);
+    }
+});
 
 tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
     const updateData = c.req.valid("json") as {
@@ -427,7 +779,12 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
             throw new HTTPException(404, { message: "Trade not found" });
         }
 
-        // Note: Brokerage validation removed as fields don't exist in current schema
+        // Check if brokerage has been calculated for this trade
+        if (existingTrade.brokerageCalculatedDate) {
+            throw new HTTPException(409, {
+                message: "Cannot update trade as brokerage has already been calculated.",
+            });
+        }
 
         // Validate client exists if clientId is being updated
         let clientId = existingTrade.clientId;
@@ -450,8 +807,8 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
         // Use a transaction for all database operations to ensure consistency
         const db = getDB();
         return await db.transaction(async (tx: TransactionType) => {
-            // Reverse the effects of the original trade
-            await reverseTrade(existingTrade, tx);
+            // Reverse the effects of the original trade with special handling for unused amounts
+            await reverseTradeForUpdate(existingTrade, tx);
 
             const newType = updateData.type ?? existingTrade.type;
             const quantity = updateData.quantity ?? existingTrade.quantity;
@@ -493,8 +850,12 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
 
             if (tradeType === TradeType.BUY) {
                 await processBuyTrade(fullTradeRecord, tx);
+                // For BUY trades, we need to recalculate amount usage from unused amounts
+                await recalculateAmountUsageForBuyTrade(fullTradeRecord, tx);
             } else if (tradeType === TradeType.SELL) {
                 await processSellTrade(fullTradeRecord, tx);
+                // For SELL trades, create new unused amount record
+                await createUnusedAmountForSellTrade(fullTradeRecord, tx);
             }
 
             return c.json({
@@ -524,8 +885,16 @@ tradeRouter.put("/update", zValidator("json", updateTradeSchema), async (c) => {
                 _errorStatus = 409;
             } else if (error.message.includes("already been sold")) {
                 _errorStatus = 400;
-            } else if (error.message.includes("Insufficient shares")) {
+            } else if (error.message.includes("Insufficient shares") || error.message.includes("Insufficient stocks")) {
+                // Block updates for insufficient stocks/shares
                 _errorStatus = 400;
+            } else if (error.message.includes("unused amount") || error.message.includes("proceeds")) {
+                // For unused amount issues, we log a warning but allow the update to proceed
+                // This should not reach here due to our reverseTradeForUpdate handling, but just in case
+                console.warn("Unused amount warning during trade update:", error.message);
+                // Don't block the update for unused amount issues
+                errorMessage = "Trade updated with warnings. Some unused amount adjustments may be needed.";
+                _errorStatus = 200; // Allow the update to proceed
             }
         }
 
@@ -681,9 +1050,12 @@ tradeRouter.delete("/delete/:id", zValidator("param", tradeGetOneSchema), async 
             // Customize error messages for better user experience
             if (error.message.includes("brokerage has already been calculated")
                 || error.message.includes("brokerage calculation first")) {
-                errorMessage = "Cannot delete this trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                errorMessage = "Cannot delete this trade as brokerage has already been calculated.";
                 _errorStatus = 409;
             } else if (error.message.includes("already been sold")) {
+                _errorStatus = 400;
+            } else if (error.message.includes("proceeds from this sale have already been partially used")) {
+                errorMessage = "Cannot delete trade because the proceeds from this sale have been used. Please reverse dependent trades first.";
                 _errorStatus = 400;
             } else if (error.message.includes("Trade not found")) {
                 _errorStatus = 404;

@@ -96,7 +96,7 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
                     // The message is already clear about brokerage calculation
                 } else {
                     // Ensure there's a clear message about brokerage
-                    error.message = error.message || "Cannot create trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                    error.message = error.message || "Cannot create trade as brokerage has already been calculated.";
                 }
             }
 
@@ -260,7 +260,7 @@ export async function deleteTrade(id: number): Promise<{ success: boolean; messa
                     // The message is already clear about brokerage calculation
                 } else {
                     // Ensure there's a clear message about brokerage
-                    error.message = error.message || "Cannot delete trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                    error.message = error.message || "Cannot delete trade as brokerage has already been calculated.";
                 }
             }
 
@@ -353,7 +353,7 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
                     // The message is already clear about brokerage calculation
                 } else {
                     // Ensure there's a clear message about brokerage
-                    error.message = error.message || "Cannot update trade as brokerage has already been calculated. Please delete the brokerage calculation first.";
+                    error.message = error.message || "Cannot update trade as brokerage has already been calculated.";
                 }
             }
 

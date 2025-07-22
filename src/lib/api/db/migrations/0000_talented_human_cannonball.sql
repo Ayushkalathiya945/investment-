@@ -15,8 +15,8 @@ CREATE TABLE `amount_usage` (
 	`amount_used` real NOT NULL,
 	`usage_date` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`unused_amount_id`) REFERENCES `unused_amounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`buy_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`unused_amount_id`) REFERENCES `unused_amounts`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`buy_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE TABLE `clients` (
@@ -38,7 +38,7 @@ CREATE TABLE `cron_job_executions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`job_id` integer NOT NULL,
 	`started_at` integer NOT NULL,
-	`finished_at` integer,
+	`completed_at` integer,
 	`status` text NOT NULL,
 	`execution_time_ms` integer,
 	`error` text,
@@ -53,9 +53,10 @@ CREATE TABLE `cron_jobs` (
 	`name` text NOT NULL,
 	`description` text,
 	`schedule` text NOT NULL,
+	`command` text NOT NULL,
 	`is_active` integer DEFAULT 1 NOT NULL,
-	`last_run_at` integer,
-	`next_run_at` integer,
+	`last_run` integer,
+	`next_run` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -70,12 +71,10 @@ CREATE TABLE `daily_brokerage` (
 	`daily_rate` real,
 	`daily_holding_rate` real NOT NULL,
 	`daily_unused_rate` real NOT NULL,
-	`days_in_quarter` integer DEFAULT 90 NOT NULL,
+	`days_in_quarter` integer,
 	`holding_brokerage` real NOT NULL,
 	`unused_brokerage` real NOT NULL,
 	`total_daily_brokerage` real NOT NULL,
-	`holding_positions_count` integer NOT NULL,
-	`unused_transactions_count` integer NOT NULL,
 	`notes` text,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
@@ -169,7 +168,7 @@ CREATE TABLE `unused_amounts` (
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`source_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`source_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `unused_client_idx` ON `unused_amounts` (`client_id`);--> statement-breakpoint

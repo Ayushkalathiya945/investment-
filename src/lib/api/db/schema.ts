@@ -48,6 +48,7 @@ export enum TradeType {
     SELL = "SELL",
 }
 
+// Exchange types
 export enum ExchangeType {
     NSE = "NSE",
     BSE = "BSE",
@@ -113,7 +114,7 @@ export const fifoAllocations = sqliteTable("fifo_allocations", {
 export const unusedAmounts = sqliteTable("unused_amounts", {
     id: int("id").primaryKey({ autoIncrement: true }),
     clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
-    sourceTradeId: int("source_trade_id").notNull().references(() => trades.id),
+    sourceTradeId: int("source_trade_id").notNull().references(() => trades.id, { onDelete: "cascade" }),
     amount: real("amount").notNull(),
     remainingAmount: real("remaining_amount").notNull(),
     startDate: int("start_date", { mode: "timestamp" }).notNull(),
@@ -129,8 +130,8 @@ export const unusedAmounts = sqliteTable("unused_amounts", {
 // Track usage of sold amounts (when cash is reinvested)
 export const amountUsage = sqliteTable("amount_usage", {
     id: int("id").primaryKey({ autoIncrement: true }),
-    unusedAmountId: int("unused_amount_id").notNull().references(() => unusedAmounts.id),
-    buyTradeId: int("buy_trade_id").notNull().references(() => trades.id),
+    unusedAmountId: int("unused_amount_id").notNull().references(() => unusedAmounts.id, { onDelete: "cascade" }),
+    buyTradeId: int("buy_trade_id").notNull().references(() => trades.id, { onDelete: "cascade" }),
     amountUsed: real("amount_used").notNull(),
     usageDate: int("usage_date", { mode: "timestamp" }).notNull(),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
@@ -146,12 +147,10 @@ export const dailyBrokerage = sqliteTable("daily_brokerage", {
     dailyRate: real("daily_rate"), // Kept for backward compatibility
     dailyHoldingRate: real("daily_holding_rate").notNull(),
     dailyUnusedRate: real("daily_unused_rate").notNull(),
-    daysInQuarter: int("days_in_quarter").notNull().default(90),
+    daysInQuarter: int("days_in_quarter"),
     holdingBrokerage: real("holding_brokerage").notNull(),
     unusedBrokerage: real("unused_brokerage").notNull(),
     totalDailyBrokerage: real("total_daily_brokerage").notNull(),
-    holdingPositionsCount: int("holding_positions_count").notNull(),
-    unusedTransactionsCount: int("unused_transactions_count").notNull(),
     notes: text("notes"),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 }, table => [
@@ -178,10 +177,11 @@ export const cronJobs = sqliteTable("cron_jobs", {
     id: int("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull().unique(),
     description: text("description"),
-    schedule: text("schedule").notNull(), // cron schedule expression
+    schedule: text("schedule").notNull(),
+    command: text("command").notNull(),
     isActive: int("is_active").notNull().default(1),
-    lastRunAt: int("last_run_at", { mode: "timestamp" }),
-    nextRunAt: int("next_run_at", { mode: "timestamp" }),
+    lastRun: int("last_run", { mode: "timestamp" }),
+    nextRun: int("next_run", { mode: "timestamp" }),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
     updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
 });
@@ -190,8 +190,8 @@ export const cronJobExecutions = sqliteTable("cron_job_executions", {
     id: int("id").primaryKey({ autoIncrement: true }),
     jobId: int("job_id").notNull().references(() => cronJobs.id, { onDelete: "cascade" }),
     startedAt: int("started_at", { mode: "timestamp" }).notNull(),
-    finishedAt: int("finished_at", { mode: "timestamp" }),
-    status: text("status", { enum: ["running", "success", "failed"] }).notNull(),
+    completedAt: int("completed_at", { mode: "timestamp" }),
+    status: text("status", { enum: ["running", "completed", "failed"] }).notNull(),
     executionTimeMs: int("execution_time_ms"),
     error: text("error"),
     logs: text("logs"),
@@ -279,6 +279,9 @@ export type NewAmountUsage = typeof amountUsage.$inferInsert;
 
 export type DailyBrokerage = typeof dailyBrokerage.$inferSelect;
 export type NewDailyBrokerage = typeof dailyBrokerage.$inferInsert;
+
+// Type for inserting daily brokerage records (excludes auto-increment id and auto-generated createdAt)
+export type InsertDailyBrokerage = Omit<NewDailyBrokerage, "id" | "createdAt">;
 
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
