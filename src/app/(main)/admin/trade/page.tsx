@@ -133,6 +133,7 @@ const TradePage: React.FC = () => {
     const {
         data: tradesResponse,
         isLoading,
+        isFetching,
         isError,
         error,
         refetch,
@@ -319,7 +320,7 @@ const TradePage: React.FC = () => {
             </div>
 
             <div className="h-full flex flex-col flex-grow gap-10 justify-between">
-                {isLoading
+                {isLoading || isFetching
                     ? (
                             <div className="flex items-center justify-center h-64">
                                 <Loader2 className="w-8 h-8 animate-spin text-primary" />

@@ -34,34 +34,6 @@ CREATE TABLE `clients` (
 CREATE UNIQUE INDEX `clients_pan_unique` ON `clients` (`pan`);--> statement-breakpoint
 CREATE UNIQUE INDEX `clients_email_unique` ON `clients` (`email`);--> statement-breakpoint
 CREATE UNIQUE INDEX `clients_mobile_unique` ON `clients` (`mobile`);--> statement-breakpoint
-CREATE TABLE `cron_job_executions` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`job_id` integer NOT NULL,
-	`started_at` integer NOT NULL,
-	`completed_at` integer,
-	`status` text NOT NULL,
-	`execution_time_ms` integer,
-	`error` text,
-	`logs` text,
-	`created_at` integer NOT NULL,
-	FOREIGN KEY (`job_id`) REFERENCES `cron_jobs`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `job_execution_idx` ON `cron_job_executions` (`job_id`,`started_at`);--> statement-breakpoint
-CREATE TABLE `cron_jobs` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`name` text NOT NULL,
-	`description` text,
-	`schedule` text NOT NULL,
-	`command` text NOT NULL,
-	`is_active` integer DEFAULT 1 NOT NULL,
-	`last_run` integer,
-	`next_run` integer,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `cron_jobs_name_unique` ON `cron_jobs` (`name`);--> statement-breakpoint
 CREATE TABLE `daily_brokerage` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`client_id` integer NOT NULL,

@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+import DatePicker from "../ui/datePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type AddTradeProps = {
@@ -968,7 +969,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                             </div>
 
                                             <div className="flex flex-col md:flex-row w-full gap-4 items-center">
-                                                {/* <div className="w-full px-1">
+                                                <div className="w-full px-1">
                                                     <FormField
                                                         control={tradeForm.control}
                                                         name="tradeDate"
@@ -993,7 +994,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                             </FormItem>
                                                         )}
                                                     />
-                                                </div> */}
+                                                </div>
                                                 <div className="w-full">
                                                     <FormField
                                                         control={tradeForm.control}
