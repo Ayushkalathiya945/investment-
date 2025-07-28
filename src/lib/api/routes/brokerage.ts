@@ -43,6 +43,8 @@ brokerageRouter.post("/get-all", zValidator("json", brokerageFilterSchema), asyn
         to,
     } = filters;
 
+    // console.log("Inside getBrokerageRecords with filters: ", filters);
+
     // Ensure periodType is valid and default to DAILY if not provided
     const validatedPeriodType = Object.values(PeriodType).includes(periodType)
         ? periodType

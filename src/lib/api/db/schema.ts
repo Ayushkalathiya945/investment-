@@ -11,6 +11,20 @@ export const admins = sqliteTable("admins", {
     lastLogin: int("last_login"),
 });
 
+// quarter days
+export const quarters = sqliteTable("quarters", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    year: int("year").notNull(),
+    quarterNumber: int("quarter_number").notNull(),
+    daysInQuarter: int("days_in_quarter").notNull(),
+    createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
+}, (table) => {
+    return {
+        uniqueYearQuarter: unique().on(table.year, table.quarterNumber),
+    };
+});
+
 // Clients table
 export const clients = sqliteTable("clients", {
     id: int("id").primaryKey({ autoIncrement: true }),
@@ -172,34 +186,6 @@ export const payments = sqliteTable("payments", {
     index("payment_client_date_idx").on(table.clientId, table.paymentDate),
 ]);
 
-// Cron Job Tracking tables
-export const cronJobs = sqliteTable("cron_jobs", {
-    id: int("id").primaryKey({ autoIncrement: true }),
-    name: text("name").notNull().unique(),
-    description: text("description"),
-    schedule: text("schedule").notNull(),
-    command: text("command").notNull(),
-    isActive: int("is_active").notNull().default(1),
-    lastRun: int("last_run", { mode: "timestamp" }),
-    nextRun: int("next_run", { mode: "timestamp" }),
-    createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-    updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
-});
-
-export const cronJobExecutions = sqliteTable("cron_job_executions", {
-    id: int("id").primaryKey({ autoIncrement: true }),
-    jobId: int("job_id").notNull().references(() => cronJobs.id, { onDelete: "cascade" }),
-    startedAt: int("started_at", { mode: "timestamp" }).notNull(),
-    completedAt: int("completed_at", { mode: "timestamp" }),
-    status: text("status", { enum: ["running", "completed", "failed"] }).notNull(),
-    executionTimeMs: int("execution_time_ms"),
-    error: text("error"),
-    logs: text("logs"),
-    createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-}, table => [
-    index("job_execution_idx").on(table.jobId, table.startedAt),
-]);
-
 // ===== RELATIONS =====
 
 export const clientRelations = relations(clients, ({ many }) => ({
@@ -246,14 +232,6 @@ export const paymentRelations = relations(payments, ({ one }) => ({
     client: one(clients, { fields: [payments.clientId], references: [clients.id] }),
 }));
 
-export const cronJobRelations = relations(cronJobs, ({ many }) => ({
-    executions: many(cronJobExecutions),
-}));
-
-export const cronJobExecutionRelations = relations(cronJobExecutions, ({ one }) => ({
-    job: one(cronJobs, { fields: [cronJobExecutions.jobId], references: [cronJobs.id] }),
-}));
-
 // ===== TYPE DEFINITIONS =====
 
 export type Admin = typeof admins.$inferSelect;
@@ -286,8 +264,5 @@ export type InsertDailyBrokerage = Omit<NewDailyBrokerage, "id" | "createdAt">;
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
 
-export type CronJob = typeof cronJobs.$inferSelect;
-export type NewCronJob = typeof cronJobs.$inferInsert;
-
-export type CronJobExecution = typeof cronJobExecutions.$inferSelect;
-export type NewCronJobExecution = typeof cronJobExecutions.$inferInsert;
+export type Quarter = typeof quarters.$inferSelect;
+export type NewQuarter = typeof quarters.$inferInsert;

@@ -36,7 +36,7 @@ type DailyBrokerageSummary = {
 export async function findAllDailyBrokerages(data: {
     page: number;
     limit: number;
-    clientId?: number;
+    clientId?: string;
     from?: Date;
     to?: Date;
 }, tx?: TransactionType): Promise<{
@@ -50,7 +50,7 @@ export async function findAllDailyBrokerages(data: {
     const conditions = [];
 
     if (data.clientId) {
-        conditions.push(eq(dailyBrokerage.clientId, data.clientId));
+        conditions.push(eq(dailyBrokerage.clientId, Number(data.clientId)));
     }
 
     // Only apply date range filters if explicitly provided
@@ -102,7 +102,7 @@ type MonthlyBrokerageSummary = {
 };
 
 export async function getMonthlyBrokerageSummary(
-    { from, to, clientId }: { from: Date; to: Date; clientId?: number },
+    { from, to, clientId }: { from: Date; to: Date; clientId?: string },
     tx?: TransactionType,
 ): Promise<MonthlyBrokerageSummary[]> {
     // Input validation
@@ -156,7 +156,7 @@ export async function getMonthlyBrokerageSummary(
             where: and(
                 gte(dailyBrokerage.date, startOfMonth),
                 lte(dailyBrokerage.date, endOfMonth),
-                clientId ? eq(dailyBrokerage.clientId, clientId) : undefined,
+                clientId ? eq(dailyBrokerage.clientId, Number(clientId)) : undefined,
             ),
             orderBy: [desc(dailyBrokerage.date)],
         });
@@ -222,7 +222,7 @@ type QuarterlyBrokerageSummary = {
 };
 
 export async function getQuarterlyBrokerageSummary(
-    { from, to, clientId }: { from: Date; to: Date; clientId?: number },
+    { from, to, clientId }: { from: Date; to: Date; clientId?: string },
     tx?: TransactionType,
 ): Promise<QuarterlyBrokerageSummary[]> {
     // Input validation
@@ -276,7 +276,7 @@ export async function getQuarterlyBrokerageSummary(
             where: and(
                 gte(dailyBrokerage.date, startOfQuarter),
                 lte(dailyBrokerage.date, endOfQuarter),
-                clientId ? eq(dailyBrokerage.clientId, clientId) : undefined,
+                clientId ? eq(dailyBrokerage.clientId, Number(clientId)) : undefined,
             ),
             orderBy: [desc(dailyBrokerage.date)],
         });

@@ -126,7 +126,7 @@ const PaymentHistory: React.FC = () => {
             try {
                 const clientFilterParams: ClientFilterRequest = {
                     page: 1,
-                    limit: 100,
+                    limit: 15,
                 };
 
                 const response = await getAllClients(clientFilterParams);
@@ -162,6 +162,7 @@ const PaymentHistory: React.FC = () => {
     const {
         data: paymentsResponse,
         isLoading,
+        isFetching,
         error,
     } = useQuery({
         queryKey: ["payments", filterParams],
@@ -295,7 +296,7 @@ const PaymentHistory: React.FC = () => {
                         </TableHeader>
 
                         <TableBody>
-                            {isLoading
+                            {isLoading || isFetching
                                 ? (
                                         <TableRow>
                                             <TableCell colSpan={5} className="text-center py-8">

@@ -140,7 +140,7 @@ export type BrokerageFilterRequest = {
     page?: number;
     limit?: number;
     periodType?: PeriodType;
-    clientId?: number;
+    clientId?: string;
     // Daily filters
     startDate?: string | Date;
     endDate?: string | Date;

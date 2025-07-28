@@ -5,6 +5,7 @@ export const CLIENT = "/admin/client";
 export const PAYMENT_HISTORY = "/admin/payment-history";
 export const BROKERAGE = "/admin/brokerage";
 export const TRADE = "/admin/trade";
+export const SETTING = "/admin/setting";
 
 export const TYPE = [
     "BUY",

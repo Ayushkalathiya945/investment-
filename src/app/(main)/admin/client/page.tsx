@@ -110,7 +110,7 @@ const Client: React.FC = () => {
     };
 
     // Fetch clients data
-    const { data: clientsResponse, isLoading: isLoadingClients, error: clientsError } = useQuery({
+    const { data: clientsResponse, isLoading: isLoadingClients, isFetching: isFetchingClients, error: clientsError } = useQuery({
         queryKey: ["clients", filterParams],
         queryFn: () => getAllClients(filterParams),
         refetchOnWindowFocus: false,
@@ -299,7 +299,7 @@ const Client: React.FC = () => {
                         </TableHeader>
 
                         <TableBody>
-                            {isLoadingClients || isSearching
+                            {isLoadingClients || isSearching || isFetchingClients
                                 ? (
                                         <TableRow>
                                             <TableCell colSpan={5} className="text-center py-8">

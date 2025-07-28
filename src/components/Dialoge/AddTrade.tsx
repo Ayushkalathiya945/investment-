@@ -206,16 +206,16 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     formattedTradeDate = new Date().toISOString().split("T")[0];
                 }
 
-                console.log("Setting form values with:", {
-                    clientId: tradeData.clientId,
-                    symbol: tradeData.symbol,
-                    exchange,
-                    tradeType: tradeData.type,
-                    quantity: tradeData.quantity,
-                    price: tradeData.price,
-                    date: formattedTradeDate,
-                    notes: tradeData.notes || "",
-                });
+                // console.log("Setting form values with:", {
+                //     clientId: tradeData.clientId,
+                //     symbol: tradeData.symbol,
+                //     exchange,
+                //     tradeType: tradeData.type,
+                //     quantity: tradeData.quantity,
+                //     price: tradeData.price,
+                //     date: formattedTradeDate,
+                //     notes: tradeData.notes || "",
+                // });
 
                 tradeForm.reset({
                     clientId: tradeData.clientId,
@@ -994,6 +994,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                         )}
                                                     />
                                                 </div> */}
+
                                                 <div className="w-full">
                                                     <FormField
                                                         control={tradeForm.control}

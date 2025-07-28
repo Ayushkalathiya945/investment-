@@ -8,9 +8,6 @@ import { PeriodType } from "@/types/brokerage";
 
 import { ApiPost } from "./api-helper";
 
-/**
- * Fetches brokerage records with the given filters
- */
 async function getBrokerageRecords(filters: BrokerageFilterRequest) {
     try {
         const {
@@ -60,10 +57,8 @@ async function getBrokerageRecords(filters: BrokerageFilterRequest) {
     }
 }
 
-/**
- * Fetches brokerage data for a specific period
- */
 export async function getPeriodicBrokerage(
+    clientId?: string,
     periodType: PeriodType = PeriodType.MONTHLY,
     period?: number,
     year?: number,
@@ -81,6 +76,7 @@ export async function getPeriodicBrokerage(
     to?: string | Date,
 ) {
     const filters: BrokerageFilterRequest = {
+        clientId,
         page,
         limit,
         periodType,

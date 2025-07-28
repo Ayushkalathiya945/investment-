@@ -45,7 +45,7 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
         if (!response || !response.success) {
             // Handle specific business logic errors that should be displayed in toast
             const errorMessage = response?.message || "Failed to create trade";
-            console.log("Error response:", JSON.stringify(response, null, 2));
+            // console.log("Error response:", JSON.stringify(response, null, 2));
             const error = new Error(errorMessage);
 
             // If the API returns specific error details, add them to the error object
@@ -69,18 +69,18 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
     } catch (error: any) {
         console.error("Trade creation API error:", error);
 
-        // Log detailed error information for debugging
-        console.log("Error details:", {
-            name: error.name,
-            message: error.message,
-            data: error.data,
-            response: error.response?.data,
-        });
+        // // Log detailed error information for debugging
+        // console.log("Error details:", {
+        //     name: error.name,
+        //     message: error.message,
+        //     data: error.data,
+        //     response: error.response?.data,
+        // });
 
         // For ApiError instances (from our ApiPost function)
         if (error.name === "ApiError") {
             // Log the error for debugging
-            console.log("ApiError instance detected:", {
+            console.error("ApiError instance detected:", {
                 message: error.message,
                 data: error.data,
                 status: error.status,
@@ -105,7 +105,7 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
                 error.error = error.data.error;
             }
         } else if (error.response) { // Handle regular Axios error responses (should not happen with our updated ApiPost)
-            console.log("Direct Axios error:", error.response);
+            console.error("Direct Axios error:", error.response);
 
             // Check for specific status codes in Axios response
             if (error.response.status === 409) {
@@ -125,7 +125,7 @@ export async function createTrade(data: CreateTradeRequest): Promise<{ data: Tra
                 error.message = error.response.data.message;
             }
 
-            console.log("Final error message:", error.message);
+            console.error("Final error message:", error.message);
         }
 
         throw error;
@@ -292,7 +292,7 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
         if (!response || !response.success) {
             // Handle specific business logic errors that should be displayed in toast
             const errorMessage = response?.message || "Failed to update trade";
-            console.log("Error response in update:", JSON.stringify(response, null, 2));
+            console.error("Error response in update:", JSON.stringify(response, null, 2));
             const error = new Error(errorMessage);
 
             // If the API returns specific error details like insufficient stocks, add them to the error object
@@ -337,7 +337,7 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
         // For ApiError instances (from our ApiPut function)
         if (error.name === "ApiError") {
             // Log the error for debugging
-            console.log("ApiError instance detected in update:", {
+            console.error("ApiError instance detected in update:", {
                 message: error.message,
                 data: error.data,
                 status: error.status,
@@ -362,7 +362,7 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
                 error.error = error.data.error;
             }
         } else if (error.response) { // Handle regular Axios error responses (should not happen with our updated ApiPut)
-            console.log("Direct Axios error in update:", error.response);
+            console.error("Direct Axios error in update:", error.response);
 
             // Check for specific status codes in Axios response
             if (error.response.status === 409) {
@@ -382,7 +382,7 @@ export async function updateTrade(id: number, data: UpdateTradeRequest): Promise
                 error.message = error.response.data.message;
             }
 
-            console.log("Final update error message:", error.message);
+            console.error("Final update error message:", error.message);
         }
 
         throw error;

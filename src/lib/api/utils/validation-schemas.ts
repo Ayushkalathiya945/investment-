@@ -93,7 +93,7 @@ export const dateRangeSchema = z.object({
 
 // Brokerage calculation schemas
 export const brokerageFilterSchema = paginationSchema.extend({
-    clientId: z.number().int().positive("Client ID must be positive").optional(),
+    clientId: z.string().optional(),
     periodType: z.nativeEnum(PeriodType).default(PeriodType.MONTHLY),
 
     // For daily date range filtering
@@ -119,7 +119,7 @@ export const brokerageFilterSchema = paginationSchema.extend({
         .optional(),
 })
     .refine((data) => {
-    // Only validate if the fields are provided
+        // Only validate if the fields are provided
         if (data.periodType === PeriodType.DAILY) {
             return !(data.startDate && data.endDate) || (!!data.startDate && !!data.endDate);
         }
@@ -138,6 +138,34 @@ export const brokerageFilterSchema = paginationSchema.extend({
             + "- MONTHLY: startMonth, startYear, endMonth, and endYear are required\n"
             + "- QUARTERLY: startQuarter, startQuarterYear, endQuarter, and endQuarterYear are required",
     });
+
+// Define the form schema using Zod
+export const quarterFormSchema = z.object({
+    year: z.coerce
+        .number({
+            required_error: "Please enter a year",
+            invalid_type_error: "Please enter a valid number",
+        })
+        .min(2000, "Year must be 2000 or later"),
+    quarters: z.array(
+        z.object({
+            quarterNumber: z.number(),
+            daysInQuarter: z.coerce
+                .number({
+                    required_error: "Please enter number of days",
+                    invalid_type_error: "Please enter a valid number",
+                })
+                .min(1, "Days must be at least 1")
+                .max(92, "A quarter cannot have more than 92 days")
+                .refine(
+                    val => Number.isInteger(Number(val)),
+                    "Days must be a whole number",
+                ),
+        }),
+    ).length(4, "All four quarters must be filled"),
+});
+
+export type QuarterFormValues = z.infer<typeof quarterFormSchema>;
 
 // Schema for API input validation
 export const brokerageSchema = z.object({

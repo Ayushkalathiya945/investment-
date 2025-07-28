@@ -1,7 +1,7 @@
 "use client";
 
 import { addMonths, endOfMonth, format, startOfMonth } from "date-fns";
-import { TrendingUp } from "lucide-react";
+import { Loader2, TrendingUp } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
@@ -13,6 +13,7 @@ import type {
 } from "@/types/brokerage";
 
 import { getPeriodicBrokerage } from "@/api/brokerage";
+import { getAllClientsForDropdown } from "@/api/client";
 import StatCard from "@/components/StatCard";
 import MonthRangePicker from "@/components/ui/monthRangePicker";
 import { Pagination } from "@/components/ui/pagination";
@@ -57,6 +58,9 @@ const Brokerage: React.FC = () => {
     const updateURL = useCallback((params: Record<string, string | number | undefined>) => {
         const newSearchParams = new URLSearchParams(searchParams.toString());
 
+        // Preserve clientId if it exists
+        const currentClientId = searchParams.get("clientId");
+
         // Clear all existing filter params first
         const filterKeys = ["periodType", "page", "selectedMonthYear", "monthFrom", "monthTo", "selectedQuarter", "selectedQuarterYear", "dateFrom", "dateTo"];
         filterKeys.forEach(key => newSearchParams.delete(key));
@@ -67,6 +71,11 @@ const Brokerage: React.FC = () => {
                 newSearchParams.set(key, value.toString());
             }
         });
+
+        // Restore clientId if it existed and wasn't explicitly changed
+        if (currentClientId && !("clientId" in params)) {
+            newSearchParams.set("clientId", currentClientId);
+        }
 
         router.push(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
     }, [searchParams, router, pathname]);
@@ -89,6 +98,7 @@ const Brokerage: React.FC = () => {
             monthTo: searchParams.get("monthTo"),
             dateFrom: searchParams.get("dateFrom"),
             dateTo: searchParams.get("dateTo"),
+            clientId: searchParams.get("clientId"),
         };
     }, [searchParams]);
 
@@ -104,6 +114,12 @@ const Brokerage: React.FC = () => {
     });
     const [totalPages, setTotalPages] = useState(1);
 
+    // clientID
+    const [clientId, setClientId] = useState<number | undefined>(() => {
+        const urlParams = initializeFromURL();
+        return urlParams.clientId ? Number.parseInt(urlParams.clientId) : undefined;
+    });
+
     // Daily (date range)
     const [selectedDateRange, setSelectedDateRange] = useState<{ from?: Date; to?: Date }>(() => {
         const urlParams = initializeFromURL();
@@ -112,6 +128,7 @@ const Brokerage: React.FC = () => {
             to: urlParams.dateTo ? new Date(urlParams.dateTo) : new Date(),
         };
     });
+
     // Monthly
     const [monthRange, setMonthRange] = useState<{ from: Date; to: Date }>(() => {
         const urlParams = initializeFromURL();
@@ -145,6 +162,9 @@ const Brokerage: React.FC = () => {
     const [totalBrokerageAmount, setTotalBrokerageAmount] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [_serverPaginationData, _setServerPaginationData] = useState<{ totalPages: number; total: number }>({ totalPages: 1, total: 0 });
+    // State for clients dropdown
+    const [clients, setClients] = useState<{ id: number; name: string }[]>([]);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
 
     // Sync current state to URL
     const syncStateToURL = useCallback(() => {
@@ -174,6 +194,38 @@ const Brokerage: React.FC = () => {
 
         updateURL(params);
     }, [periodType, currentPage, selectedDateRange, selectedMonthYear, monthRange, selectedQuarter, selectedQuarterYear, updateURL]);
+
+    // Fetch clients for dropdown
+    useEffect(() => {
+        const fetchClients = async () => {
+            setIsLoadingClients(true);
+            try {
+                const clientsData = await getAllClientsForDropdown();
+                setClients(clientsData);
+            } catch (error) {
+                console.error("Error fetching clients:", error);
+                toast.error("Failed to load client list");
+            } finally {
+                setIsLoadingClients(false);
+            }
+        };
+
+        fetchClients();
+    }, []);
+
+    const handleClientChange = (value: string) => {
+        if (value === "all") {
+            setClientId(undefined);
+            updateURL({ clientId: undefined });
+        } else {
+            const numValue = Number.parseInt(value);
+            if (!Number.isNaN(numValue)) {
+                setClientId(numValue);
+                updateURL({ clientId: value });
+            }
+        }
+        setCurrentPage(1);
+    };
 
     // Fetch data based on period type and filters
     const fetchBrokerageData = useCallback(async () => {
@@ -220,6 +272,7 @@ const Brokerage: React.FC = () => {
             // });
 
             const response = await getPeriodicBrokerage(
+                clientId?.toString(),
                 apiPeriodType, // periodType
                 period, // period
                 year, // year
@@ -304,7 +357,7 @@ const Brokerage: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [periodType, selectedMonthYear, monthRange, selectedQuarter, selectedQuarterYear, currentPage, selectedDateRange, syncStateToURL]);
+    }, [clientId, periodType, selectedMonthYear, monthRange, selectedQuarter, selectedQuarterYear, currentPage, selectedDateRange, syncStateToURL]);
 
     // Fetch data when component mounts or dependencies change
     useEffect(() => {
@@ -353,6 +406,35 @@ const Brokerage: React.FC = () => {
             <div className="flex-col md:flex md:flex-row justify-between w-full">
                 <h1 className="text-3xl font-semibold">Fees</h1>
                 <div className="flex-col md:flex md:flex-row gap-4 items-center">
+
+                    <div className="w-full md:w-1/3">
+                        <Select
+                            value={clientId ? String(clientId) : "all"}
+                            onValueChange={handleClientChange}
+                        >
+                            <SelectTrigger className="w-full ring-0">
+                                <SelectValue placeholder="Select Client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Clients</SelectItem>
+                                {clients.map(client => (
+                                    <SelectItem
+                                        key={client.id}
+                                        value={String(client.id)}
+                                    >
+                                        {client.name}
+                                    </SelectItem>
+                                ))}
+                                {isLoadingClients && (
+                                    <div className="flex items-center justify-center p-2">
+                                        <Loader2 className="w-4 h-4 animate-spin text-primary mr-2" />
+                                        Loading clients...
+                                    </div>
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     {/* Period Type Dropdown */}
                     <div className="flex min-w-50">
                         <Select
@@ -496,12 +578,12 @@ const Brokerage: React.FC = () => {
                                                 let periodDisplay = "";
 
                                                 if ("totalDailyBrokerage" in item) {
-                                                    // Daily brokerage record
+                                                // Daily brokerage record
                                                     clientName = item.clientName;
                                                     amount = item.totalDailyBrokerage;
                                                     periodDisplay = new Date(item.date).toLocaleDateString();
                                                 } else if ("brokerageAmount" in item) {
-                                                    // Monthly or Quarterly summary
+                                                // Monthly or Quarterly summary
                                                     clientName = item.clientName;
                                                     amount = item.brokerageAmount;
 
@@ -515,8 +597,9 @@ const Brokerage: React.FC = () => {
                                                     }
                                                 }
 
+                                                const uniqueKey = `client-${item.clientId}-period-${periodDisplay.replace(/\s+/g, "-").toLowerCase()}`;
                                                 return (
-                                                    <TableRow key={`${item.clientId}-${index}`}>
+                                                    <TableRow key={uniqueKey}>
                                                         <TableCell>{serialNumber}</TableCell>
                                                         <TableCell>{clientName}</TableCell>
                                                         <TableCell className="text-green-500">

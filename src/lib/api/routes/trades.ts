@@ -1017,8 +1017,6 @@ tradeRouter.delete("/delete/:id", zValidator("param", tradeGetOneSchema), async 
             throw new HTTPException(404, { message: "Trade not found" });
         }
 
-        // Note: Brokerage validation removed as fields don't exist in current schema
-
         // Use a transaction for all database operations to ensure consistency
         const db = getDB();
         return await db.transaction(async (tx: TransactionType) => {

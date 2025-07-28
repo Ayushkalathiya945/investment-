@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Pencil, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 import type { ClientDropdownItem } from "@/types/client";
@@ -76,9 +76,8 @@ const TradePage: React.FC = () => {
     };
 
     // Update URL with current filters
-    const updateUrlWithFilters = () => {
+    const updateUrlWithFilters = useCallback(() => {
         const params = new URLSearchParams();
-
         if (clientId)
             params.set("clientId", clientId.toString());
         if (searchTerm)
@@ -93,11 +92,11 @@ const TradePage: React.FC = () => {
             params.set("endDate", formatDateForTradeApi(dateRange.to) || "");
 
         router.push(`?${params.toString()}`);
-    };
+    }, [clientId, searchTerm, tradeType, currentPage, dateRange, router]);
 
     useEffect(() => {
         updateUrlWithFilters();
-    }, [clientId, searchTerm, tradeType, currentPage, dateRange]);
+    }, [updateUrlWithFilters]);
 
     // Fetch clients for dropdown
     useEffect(() => {
@@ -133,6 +132,7 @@ const TradePage: React.FC = () => {
     const {
         data: tradesResponse,
         isLoading,
+        isFetching,
         isError,
         error,
         refetch,
@@ -319,7 +319,7 @@ const TradePage: React.FC = () => {
             </div>
 
             <div className="h-full flex flex-col flex-grow gap-10 justify-between">
-                {isLoading
+                {isLoading || isFetching
                     ? (
                             <div className="flex items-center justify-center h-64">
                                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
