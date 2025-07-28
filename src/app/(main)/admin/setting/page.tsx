@@ -148,7 +148,7 @@ function Page() {
 
                         {/* Quarters Grid Skeleton */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-                            {[1, 2, 3, 4].map((quarter) => (
+                            {[1, 2, 3, 4].map(quarter => (
                                 <Card key={quarter}>
                                     <CardHeader className="pb-2">
                                         <Skeleton className="h-6 w-8" />
@@ -184,11 +184,7 @@ function Page() {
             </AlertTitle>
             <AlertDescription className="text-red-700 dark:text-red-400 mt-2">
                 <div className="space-y-2">
-                    <p>
-                        No quarter data found for
-                        {" " + selectedYear}
-                        .
-                    </p>
+                    <p>{`No quarter data found for ${selectedYear}`}</p>
                     <div className="flex items-center gap-2 text-sm">
                         <Calendar className="h-3 w-3" />
                         <span>Please add quarter data using the form below to enable brokerage calculations.</span>
