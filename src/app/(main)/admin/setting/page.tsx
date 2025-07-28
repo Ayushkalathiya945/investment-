@@ -185,8 +185,8 @@ function Page() {
             <AlertDescription className="text-red-700 dark:text-red-400 mt-2">
                 <div className="space-y-2">
                     <p>
-                        No quarter data found for {" "}
-                        {selectedYear}
+                        No quarter data found for
+                        {" " + selectedYear}
                         .
                     </p>
                     <div className="flex items-center gap-2 text-sm">
