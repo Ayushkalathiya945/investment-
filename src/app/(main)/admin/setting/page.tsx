@@ -190,7 +190,7 @@ function Page() {
                     <p>
                         Quarter data for
                         {" "}
-                        {currentYear}
+                        {selectedYear}
                         {" "}
                         is already configured and active.
                     </p>
@@ -198,7 +198,7 @@ function Page() {
                         <span className="font-medium">
                             ⚠️ Important: Any updates will be reflected from today onwards for all fees calculations of
                             {" "}
-                            {currentYear}
+                            {selectedYear}
                             .
                         </span>
                     </div>
