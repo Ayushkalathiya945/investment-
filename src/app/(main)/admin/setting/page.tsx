@@ -2,8 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Calendar, Info, Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { AlertTriangle, Calendar, Info } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
 
@@ -22,19 +22,28 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { quarterFormSchema } from "@/lib/api/utils/validation-schemas";
 
 function Page() {
     const queryClient = useQueryClient();
     const currentYear = new Date().getFullYear();
+    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
     const defaultValues: Partial<QuarterFormValues> = {
         year: currentYear,
         quarters: [
-            { quarterNumber: 1, daysInQuarter: 1 },
-            { quarterNumber: 2, daysInQuarter: 1 },
-            { quarterNumber: 3, daysInQuarter: 1 },
-            { quarterNumber: 4, daysInQuarter: 1 },
+            { quarterNumber: 1, daysInQuarter: 64 },
+            { quarterNumber: 2, daysInQuarter: 65 },
+            { quarterNumber: 3, daysInQuarter: 66 },
+            { quarterNumber: 4, daysInQuarter: 66 },
         ],
     };
 
@@ -45,8 +54,8 @@ function Page() {
 
     // Get quarter data for current year
     const { data: currentYearData, isLoading } = useQuery({
-        queryKey: ["quarter", currentYear],
-        queryFn: () => getQuartersByYear(currentYear),
+        queryKey: ["quarter", selectedYear],
+        queryFn: () => getQuartersByYear(selectedYear),
     });
 
     // Mutation function for create
@@ -107,10 +116,38 @@ function Page() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-[60vh]">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                    <p>Loading quarter data...</p>
+            <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <Skeleton className="h-8 w-48 mb-2" />
+                        <Skeleton className="h-4 w-64" />
+                    </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {[1, 2, 3, 4].map(quarter => (
+                        <Card key={quarter}>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <Skeleton className="h-5 w-24" />
+                                <Skeleton className="h-4 w-4" />
+                            </CardHeader>
+                            <CardContent>
+                                <Skeleton className="h-8 w-16 mb-1" />
+                                <Skeleton className="h-4 w-32" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+                <div className="space-y-4">
+                    <Skeleton className="h-10 w-32" />
+                    <div className="space-y-2">
+                        {[1, 2, 3, 4].map(item => (
+                            <div key={item} className="flex items-center justify-between p-4 border rounded-lg">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-10 w-24" />
+                                <Skeleton className="h-10 w-24" />
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         );
@@ -129,9 +166,7 @@ function Page() {
                 <div className="space-y-2">
                     <p>
                         No quarter data found for
-                        {" "}
-                        {" "}
-                        {currentYear}
+                        {selectedYear}
                         .
                     </p>
                     <div className="flex items-center gap-2 text-sm">
@@ -191,20 +226,35 @@ function Page() {
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             <div className="space-y-4">
                                 {/* Year Field */}
-                                <div className="w-[250px] ">
+                                <div className="w-[300px]">
                                     <FormField
                                         control={form.control}
                                         name="year"
-                                        render={({ field }) => (
+                                        render={() => (
                                             <FormItem>
                                                 <FormLabel>Year</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="2023"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
+                                                <Select
+                                                    onValueChange={(value) => {
+                                                        const year = Number(value);
+                                                        setSelectedYear(year);
+                                                        form.setValue("year", year);
+                                                    }}
+                                                    value={selectedYear.toString()}
+                                                >
+
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select year" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {Array.from({ length: 7 }, (_, i) => currentYear - 3 + i).map(year => (
+                                                            <SelectItem key={year} value={year.toString()}>
+                                                                {year}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
