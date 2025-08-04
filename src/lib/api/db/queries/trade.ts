@@ -4,7 +4,7 @@ import type { TransactionType } from "../";
 import type { NewTrade } from "../schema";
 
 import { getDB } from "../index";
-import { trades, TradeType } from "../schema";
+import { holdings, stocks, trades, TradeType } from "../schema";
 
 export async function create(data: NewTrade, tx?: TransactionType) {
     const [trade] = await getDB(tx).insert(trades).values(data).returning();
@@ -193,4 +193,41 @@ export async function currentHoldingAmount(clientId: number, tx?: TransactionTyp
         .where(eq(trades.clientId, clientId));
 
     return currentHoldingAmount[0]?.currentHoldingAmount || 0;
+}
+
+// total profit amount
+export async function getTotalProfitAmount(clientId: number, tx?: TransactionType) {
+    const db = getDB(tx);
+
+    const totalProfit = await db
+        .select({
+            totalProfit: sql<number>`COALESCE(SUM(${trades.profit}), 0)`,
+        })
+        .from(trades)
+        .where(
+            eq(trades.clientId, clientId),
+            eq(trades.type, TradeType.SELL),
+        );
+
+    return totalProfit[0]?.totalProfit || 0;
+}
+
+export async function getTotalPortfolioAmount(clientId: number, tx?: TransactionType) {
+    const db = getDB(tx);
+
+    const portfolioValue = await db
+        .select({
+            totalPortfolioValue: sql<number>`COALESCE(SUM(${holdings.holding} * ${stocks.currentPrice}), 0)`,
+        })
+        .from(holdings)
+        .innerJoin(
+            stocks,
+            and(
+                eq(holdings.symbol, stocks.symbol),
+                eq(holdings.exchange, stocks.exchange),
+            ),
+        )
+        .where(eq(holdings.clientId, clientId));
+
+    return portfolioValue[0]?.totalPortfolioValue || 0;
 }

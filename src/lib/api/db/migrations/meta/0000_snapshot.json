@@ -1,7 +1,7 @@
 {
     "version": "6",
     "dialect": "sqlite",
-    "id": "f6a3a87b-d448-4417-87dd-a0a08f425fa7",
+    "id": "2d46b59c-3f5e-4848-9014-d253b0e7a8dc",
     "prevId": "00000000-0000-0000-0000-000000000000",
     "tables": {
         "admins": {
@@ -196,8 +196,8 @@
                     "autoincrement": false,
                     "default": 0
                 },
-                "current_holdings": {
-                    "name": "current_holdings",
+                "used_amount": {
+                    "name": "used_amount",
                     "type": "real",
                     "primaryKey": false,
                     "notNull": true,
@@ -832,6 +832,22 @@
                     "primaryKey": false,
                     "notNull": false,
                     "autoincrement": false
+                },
+                "profit": {
+                    "name": "profit",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
+                },
+                "buy_amount": {
+                    "name": "buy_amount",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
                 },
                 "brokerage_calculated_date": {
                     "name": "brokerage_calculated_date",

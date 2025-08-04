@@ -504,7 +504,7 @@ const Brokerage: React.FC = () => {
                                 <TableHead className="rounded-tl-xl py-4 px-6 text-left font-medium text-gray-700 w-[8%]">No.</TableHead>
                                 <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[20%]">Client</TableHead>
                                 <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[18%]">Total Holding Amount</TableHead>
-                                <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[18%]">Total Unused Amount</TableHead>
+                                <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[18%]">Total Deployed Amount</TableHead>
                                 <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[18%]">Total Fees</TableHead>
                                 <TableHead className="rounded-tr-xl py-4 px-6 text-left font-medium text-gray-700 w-[18%]">
                                     {periodType === "QUARTERLY"

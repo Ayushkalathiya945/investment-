@@ -22,11 +22,11 @@ const tradeRouter = new Hono();
 
 tradeRouter.use("*", authMiddleware);
 
-async function createTradeAllocationsForSell(sellTrade: Trade, tx?: TransactionType): Promise<void> {
+async function createTradeAllocationsForSell(sellTrade: Trade, tx?: TransactionType): Promise<number> {
     const { clientId, symbol, exchange, quantity: sellQuantity } = sellTrade;
 
     const tradeTimestamp = validateAndConvertToTimestamp(sellTrade.tradeDate, "trade date");
-    const availableBuyTrades = await tradeQueries.findBuyTradesWithRemainingQuantity({
+    const availableBuyTrades: Trade[] = await tradeQueries.findBuyTradesWithRemainingQuantity({
         clientId,
         symbol,
         exchange,
@@ -34,12 +34,15 @@ async function createTradeAllocationsForSell(sellTrade: Trade, tx?: TransactionT
     }, tx);
 
     let remainingToAllocate = sellQuantity;
+    let buyAmount = 0;
 
     for (const buyTrade of availableBuyTrades) {
         if (remainingToAllocate <= 0)
             break;
 
         const quantityToAllocate = Math.min(remainingToAllocate, buyTrade.remainingQuantity);
+
+        buyAmount += buyTrade.price * quantityToAllocate;
 
         // Create the allocation record
         await tradeAllocationQueries.tradeAllocationQueries.create({
@@ -61,9 +64,11 @@ async function createTradeAllocationsForSell(sellTrade: Trade, tx?: TransactionT
     if (remainingToAllocate > 0) {
         console.warn(`Could not fully allocate sell trade ${sellTrade.id}. Remaining quantity: ${remainingToAllocate}`);
     }
+
+    return buyAmount;
 }
 
-async function processSellTrade(sellTrade: Trade, tx?: TransactionType): Promise<void> {
+async function processSellTrade(sellTrade: Trade, tx?: TransactionType): Promise<number> {
     const { clientId, symbol, exchange, quantity } = sellTrade;
 
     // Check current holdings
@@ -84,7 +89,9 @@ async function processSellTrade(sellTrade: Trade, tx?: TransactionType): Promise
     await holdingQueries.updateHoldings(clientId, symbol, exchange, -quantity, tx);
 
     // Create trade allocations
-    await createTradeAllocationsForSell(sellTrade, tx);
+    const buyAmount = await createTradeAllocationsForSell(sellTrade, tx);
+
+    return buyAmount;
 }
 
 async function updateTrade(
@@ -327,6 +334,8 @@ async function reverseTradeEffects(trade: Trade, tx?: TransactionType): Promise<
 async function applyTradeEffects(trade: Trade, tx?: TransactionType): Promise<void> {
     const { type } = trade;
 
+    let buyamount = 0;
+
     if (type === TradeType.BUY) {
         await clientQueries.updateCurrentHoldingAmount(trade.clientId, -trade.netAmount, tx);
         await holdingQueries.updateHoldings(trade.clientId, trade.symbol, trade.exchange, trade.quantity, tx);
@@ -358,7 +367,8 @@ async function applyTradeEffects(trade: Trade, tx?: TransactionType): Promise<vo
             amountToCover -= amountToUse;
         }
     } else if (type === TradeType.SELL) {
-        await processSellTrade(trade, tx);
+        const buyAmount = await processSellTrade(trade, tx);
+        buyamount = buyAmount;
         await clientQueries.updateCurrentHoldingAmount(trade.clientId, trade.netAmount, tx);
 
         await unusedAmountQueries.create({
@@ -368,6 +378,12 @@ async function applyTradeEffects(trade: Trade, tx?: TransactionType): Promise<vo
             remainingAmount: trade.netAmount,
             startDate: new Date(trade.tradeDate),
             lastBrokerageDate: new Date(trade.tradeDate),
+        }, tx);
+
+        await tradeQueries.update({
+            id: trade.id,
+            buyAmount: buyamount,
+            profit: trade.netAmount - buyamount,
         }, tx);
     }
 }
@@ -412,9 +428,11 @@ tradeRouter.post("/create", zValidator("json", tradeSchema), async (c) => {
                 netAmount: tradeValue,
                 notes: tradeData.notes || null,
                 remainingQuantity: tradeData.type === TradeType.BUY ? tradeData.quantity : 0,
+                brokerageCalculatedDate: null,
             };
 
             const newTrade = await tradeQueries.create(tradeData2Create, tx);
+
             if (!newTrade) {
                 throw new HTTPException(500, { message: "Failed to create trade" });
             }

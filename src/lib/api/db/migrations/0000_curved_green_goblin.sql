@@ -27,7 +27,7 @@ CREATE TABLE `clients` (
 	`mobile` text NOT NULL,
 	`address` text,
 	`purse_amount` real DEFAULT 0 NOT NULL,
-	`current_holdings` real DEFAULT 0 NOT NULL,
+	`used_amount` real DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -122,6 +122,8 @@ CREATE TABLE `trades` (
 	`net_amount` real NOT NULL,
 	`remaining_quantity` integer NOT NULL,
 	`notes` text,
+	`profit` integer DEFAULT 0 NOT NULL,
+	`buy_amount` integer DEFAULT 0 NOT NULL,
 	`brokerage_calculated_date` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,

@@ -1,10 +1,10 @@
-import { and, desc, eq, gt, gte, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 
 import type { TransactionType } from "../index";
 import type { NewClient } from "../schema";
 
 import { getDB } from "../index";
-import { clients, dailyBrokerage, payments, trades, TradeType } from "../schema";
+import { clients, dailyBrokerage, holdings, payments, stocks, trades, TradeType } from "../schema";
 
 export async function create(data: NewClient, tx?: TransactionType) {
     const [client] = await getDB(tx).insert(clients).values(data).returning();
@@ -164,23 +164,26 @@ export async function calculateFinancialTotalsByDateRange(
         if (to)
             clientCountQuery.where(lte(clients.createdAt, endOfDayTo!));
 
-        const baseConditions = [
-            eq(trades.type, TradeType.BUY),
-            gt(trades.remainingQuantity, 0),
-        ];
-
-        const portfolioValueQuery = db
+        //  Portfolio value take price from stock table
+        const portfolioValueQuery = await db
             .select({
-                totalValue: sql<number>`COALESCE(SUM(
-      CASE 
-        WHEN ${trades.type} = 'BUY' AND ${trades.remainingQuantity} > 0 
-        THEN ${trades.remainingQuantity} * ${trades.price}
-        ELSE 0
-      END
-    ), 0)`,
+                totalPortfolioValue: sql<number>`COALESCE(SUM(${holdings.holding} * ${stocks.currentPrice}), 0)`,
+            })
+            .from(holdings)
+            .innerJoin(
+                stocks,
+                and(
+                    eq(holdings.symbol, stocks.symbol),
+                    eq(holdings.exchange, stocks.exchange),
+                ),
+            );
+
+        const totalProfit = await db
+            .select({
+                totalProfit: sql<number>`COALESCE(SUM(${trades.profit}), 0)`,
             })
             .from(trades)
-            .where(and(...baseConditions));
+            .where(eq(trades.type, TradeType.SELL));
 
         const fees = db.select({
             totalFees: sql<number>`COALESCE(SUM(${dailyBrokerage.totalDailyBrokerage}), 0)`,
@@ -203,8 +206,6 @@ export async function calculateFinancialTotalsByDateRange(
         if (to)
             paymentsQuery.where(lte(payments.paymentDate, endOfDayTo!));
 
-        // Get total BUY trades value up to the end date (not limited by start date)
-        // For accurate purse amount calculation, we need ALL buy trades up to the end date
         const buyTradesQuery = db
             .select({
                 totalBuyTrades: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)`,
@@ -225,10 +226,9 @@ export async function calculateFinancialTotalsByDateRange(
             })
             .from(clients);
 
-        const [clientCount, portfolioResult, paymentsResult, buyTradesResult, sellTradesResult, purseAmountResult, feesResult]
+        const [clientCount, paymentsResult, buyTradesResult, sellTradesResult, purseAmountResult, feesResult]
             = await Promise.all([
                 clientCountQuery.execute(),
-                portfolioValueQuery.execute(),
                 paymentsQuery.execute(),
                 buyTradesQuery.execute(),
                 sellTradesQuery.execute(),
@@ -238,7 +238,8 @@ export async function calculateFinancialTotalsByDateRange(
 
         const result = {
             totalClient: Number(clientCount[0]?.count || 0),
-            totalPortfolioValue: Number(portfolioResult[0]?.totalValue || 0),
+            totalPortfolioValue: Number(portfolioValueQuery[0]?.totalPortfolioValue || 0),
+            totalProfit: Number(totalProfit[0]?.totalProfit || 0),
             totalPayments: Number(paymentsResult[0]?.totalPayments || 0),
             totalBuyTrades: Number(buyTradesResult[0]?.totalBuyTrades || 0),
             totalSellTrades: Number(sellTradesResult[0]?.totalSellTrades || 0),
@@ -253,6 +254,7 @@ export async function calculateFinancialTotalsByDateRange(
         return {
             totalClient: 0,
             totalPortfolioValue: 0,
+            totalProfit: 0,
             totalFees: 0,
             totalPayments: 0,
             totalBuyTrades: 0,
@@ -268,7 +270,7 @@ export async function updateCurrentHoldingAmount(clientId: number, amount: numbe
     await db
         .update(clients)
         .set({
-            currentHoldings: sql<number>`current_holdings + ${amount}`,
+            usedAmount: sql<number>`used_amount + ${amount}`,
         })
         .where(eq(clients.id, clientId))
         .returning();
@@ -297,7 +299,7 @@ export async function getAndUpdateCurrentTotalHoldingAmount(clientId: number, tx
 
     await db.update(clients)
         .set({
-            currentHoldings: amount,
+            usedAmount: amount,
         })
         .where(eq(clients.id, clientId));
 }

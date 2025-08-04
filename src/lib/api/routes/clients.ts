@@ -167,7 +167,7 @@ clientRouter.get("/get-one/:id", zValidator("param", clientGetOneSchema), async 
             throw new HTTPException(404, { message: "Client not found" });
         }
 
-        const totalNetAmount = client.currentHoldings;
+        const totalNetInvestedAmount = client.usedAmount;
 
         const totalBrokerageAmount = await brokerageQueries.calculateTotalbrokerageAmount({ clientId: id });
 
@@ -175,20 +175,23 @@ clientRouter.get("/get-one/:id", zValidator("param", clientGetOneSchema), async 
 
         const totalSoldAmount = await tradeQueries.calculateTotalSoldAmount({ clientId: id });
 
-        const totalTradeAmount = await tradeQueries.currentHoldingAmount(id);
+        const totalPortfolioAmount = await tradeQueries.getTotalPortfolioAmount(id);
 
-        const remainingPurseAmount = client.purseAmount + totalNetAmount;
+        const totalProfit = await tradeQueries.getTotalProfitAmount(id);
+
+        const remainingPurseAmount = client.purseAmount + totalNetInvestedAmount;
 
         return c.json({
             success: true,
             data: {
                 ...client,
-                totalNetAmount,
-                totalTradeAmount,
+                totalNetInvestedAmount,
+                totalPortfolioAmount,
                 totalBrokerageAmount,
                 totalPaymentAmount,
                 totalSoldAmount,
                 remainingPurseAmount,
+                totalProfit,
             },
         });
     } catch (error) {
@@ -311,6 +314,7 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
                 totalValue: financialTotals.totalPortfolioValue,
                 totalPayment: financialTotals.totalPayments,
                 totalFees: financialTotals.totalFees,
+                totalProfit: financialTotals.totalProfit,
                 remainingPurseAmount,
             },
             _debug: {

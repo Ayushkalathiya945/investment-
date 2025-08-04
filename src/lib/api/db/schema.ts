@@ -34,7 +34,7 @@ export const clients = sqliteTable("clients", {
     mobile: text("mobile").notNull().unique(),
     address: text("address"),
     purseAmount: real("purse_amount").notNull().default(0),
-    currentHoldings: real("current_holdings").notNull().default(0),
+    usedAmount: real("used_amount").notNull().default(0),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
     updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
 });
@@ -82,6 +82,10 @@ export const trades = sqliteTable("trades", {
     netAmount: real("net_amount").notNull(),
     remainingQuantity: int("remaining_quantity").notNull(),
     notes: text("notes"),
+
+    // profit
+    profit: int("profit").notNull().default(0),
+    buyAmount: int("buy_amount").notNull().default(0),
 
     // Brokerage calculation tracking
     brokerageCalculatedDate: int("brokerage_calculated_date", { mode: "timestamp" }),

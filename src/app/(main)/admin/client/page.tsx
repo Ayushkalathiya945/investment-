@@ -2,7 +2,7 @@
 import type { DateRange } from "react-day-picker";
 
 import { useQuery } from "@tanstack/react-query";
-import { IndianRupee, Loader2, Search, TrendingDown, TrendingUp, Users } from "lucide-react";
+import { BarChart2, ChartNoAxesCombined, IndianRupee, Loader2, Search, TrendingDown, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -177,6 +177,7 @@ const Client: React.FC = () => {
         totalTradeAmount: analyticsResponse?.data.totalValue || 0,
         totalFeesAmount: analyticsResponse?.data.totalFees || 0,
         totalPaymentAmount: analyticsResponse?.data.totalPayment || 0,
+        totalProfitAmount: analyticsResponse?.data.totalProfit || 0,
         remainingPurseAmount: analyticsResponse?.data.remainingPurseAmount || 0,
     };
 
@@ -203,7 +204,7 @@ const Client: React.FC = () => {
                     isLoading={isLoadingAnalytics}
                 />
                 <StatCard
-                    icon={<IndianRupee />}
+                    icon={<ChartNoAxesCombined />}
                     value={typeof analytics.totalTradeAmount === "number"
                         ? `₹${analytics.totalTradeAmount.toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
@@ -213,8 +214,21 @@ const Client: React.FC = () => {
                     label="Total Value"
                     isLoading={isLoadingAnalytics}
                 />
+
                 <StatCard
-                    icon={<TrendingUp />}
+                    icon={<BarChart2 />}
+                    value={typeof analytics.totalTradeAmount === "number"
+                        ? `₹${analytics.totalProfitAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        })}`
+                        : "₹0"}
+                    label="Total Profit"
+                    isLoading={isLoadingAnalytics}
+                />
+
+                <StatCard
+                    icon={<IndianRupee />}
                     value={typeof analytics.totalFeesAmount === "number"
                         ? `₹${analytics.totalFeesAmount.toLocaleString("en-IN", {
                             minimumFractionDigits: 2,

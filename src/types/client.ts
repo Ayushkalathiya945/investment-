@@ -39,12 +39,14 @@ export type Client = {
     createdAt?: string;
     updatedAt?: string;
 
-    totalNetAmount?: number;
+    totalNetInvestedAmount?: number;
     totalTradeAmount?: number;
     totalBrokerageAmount?: number;
     totalPaymentAmount?: number;
     totalSoldAmount?: number;
     remainingPurseAmount?: number;
+    totalProfit?: number;
+    totalPortfolioAmount?: number;
 };
 
 export type ClientCreateRequest = {
@@ -75,8 +77,8 @@ export type ClientFilterRequest = {
     page: number;
     limit: number;
     search?: string;
-    from?: string; // Server-side expected format (YYYY-MM-DD)
-    to?: string; // Server-side expected format (YYYY-MM-DD)
+    from?: string;
+    to?: string;
 };
 
 export type ClientUpdateRequest = {
@@ -97,6 +99,7 @@ export type ClientAnalyticsResponse = {
         totalValue: number;
         totalPayment: number;
         totalFees: number;
+        totalProfit: number;
         remainingPurseAmount: number;
     };
     _debug?: {
@@ -107,19 +110,16 @@ export type ClientAnalyticsResponse = {
     };
 };
 
-// Type for client dropdown items
 export type ClientDropdownItem = {
     id: number;
     name: string;
 };
 
-// Response type for client dropdown API
 export type ClientDropdownResponse = {
     success: boolean;
     data: ClientDropdownItem[];
 };
 
-// Financial totals response type
 export type FinancialTotalsResponse = {
     success: boolean;
     data: {
@@ -129,8 +129,7 @@ export type FinancialTotalsResponse = {
     };
 };
 
-// Financial totals request type
 export type FinancialTotalsRequest = {
-    from?: number; // Unix timestamp
-    to?: number; // Unix timestamp
+    from?: number;
+    to?: number;
 };

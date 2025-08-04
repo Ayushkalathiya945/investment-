@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, ChevronLeft, CreditCard, IndianRupee, Loader2, Mail, MapPin, Phone, TrendingUp, Wallet } from "lucide-react";
+import { ArrowUpRight, BarChart2, ChartNoAxesCombined, ChevronLeft, CreditCard, IndianRupee, Loader2, Mail, MapPin, Phone, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState } from "react";
@@ -12,6 +12,7 @@ import type { AddClient as ClientType } from "@/types/client";
 import { deleteClient, getClientById } from "@/api/client";
 import AddClient from "@/components/Dialoge/AddClient";
 import AddPayment from "@/components/Dialoge/AddPayment";
+import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -126,108 +127,65 @@ const ClientDetail: React.FC = () => {
                 </div>
             </div>
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-5">
-                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-500 truncate">Total Portfolio Value</p>
-                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
-                                ₹
-                                {client.totalTradeAmount?.toLocaleString() || "0"}
-                            </p>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                            <div className="bg-blue-50 p-2 rounded-lg">
-                                <IndianRupee className="h-5 w-5 text-blue-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-500 truncate">Net Amount</p>
-                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
-                                ₹
-                                {client.totalNetAmount?.toLocaleString() || "0"}
-                            </p>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                            <div className="bg-green-50 p-2 rounded-lg">
-                                <TrendingUp className="h-5 w-5 text-green-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-500 truncate">Initial Purse Amount</p>
-                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
-                                ₹
-                                {client.purseAmount?.toLocaleString() || "0"}
-                            </p>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                            <div className="bg-purple-50 p-2 rounded-lg">
-                                <CreditCard className="h-5 w-5 text-purple-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-500 truncate">Remaining Purse Amount</p>
-                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
-                                ₹
-                                {client.remainingPurseAmount?.toLocaleString() || "0"}
-                            </p>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                            <div className="bg-orange-50 p-2 rounded-lg">
-                                <Wallet className="h-5 w-5 text-orange-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-500 truncate">Total Fees</p>
-                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
-                                ₹
-                                {client.totalBrokerageAmount?.toLocaleString() || "0"}
-                            </p>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                            <div className="bg-red-50 p-2 rounded-lg">
-                                <TrendingUp className="h-5 w-5 text-red-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-500 truncate">Total Payments</p>
-                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
-                                ₹
-                                {client.totalPaymentAmount?.toLocaleString() || "0"}
-                            </p>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                            <div className="bg-indigo-50 p-2 rounded-lg">
-                                <CreditCard className="h-5 w-5 text-indigo-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                <StatCard
+                    icon={<ChartNoAxesCombined className="h-6 w-6" />}
+                    value={`₹${client.totalPortfolioAmount?.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    }) || "0"}`}
+                    label="Total Portfolio Value"
+                />
+                <StatCard
+                    icon={<BarChart2 className="h-6 w-6" />}
+                    value={`₹${client.totalProfit?.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    }) || "0"}`}
+                    label="Total Profit"
+                />
+                <StatCard
+                    icon={<TrendingUp className="h-6 w-6" />}
+                    value={`₹${client.totalNetInvestedAmount != null && client.totalNetInvestedAmount !== 0
+                        ? (-client.totalNetInvestedAmount).toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })
+                        : "0.00"}`}
+                    label="Total Invested Amount"
+                />
+                <StatCard
+                    icon={<CreditCard className="h-6 w-6" />}
+                    value={`₹${client.purseAmount?.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    }) || "0"}`}
+                    label="Initial Purse Amount"
+                />
+                <StatCard
+                    icon={<Wallet className="h-6 w-6" />}
+                    value={`₹${client.remainingPurseAmount?.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    }) || "0"}`}
+                    label="Remaining Purse Amount"
+                />
+                <StatCard
+                    icon={<IndianRupee className="h-6 w-6 " />}
+                    value={`₹${client.totalBrokerageAmount?.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    }) || "0"}`}
+                    label="Total Fees"
+                />
+                <StatCard
+                    icon={<CreditCard className="h-6 w-6 text-indigo-600" />}
+                    value={`₹${client.totalPaymentAmount?.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    }) || "0"}`}
+                    label="Total Payments"
+                />
             </div>
 
             {/* Client Details */}
