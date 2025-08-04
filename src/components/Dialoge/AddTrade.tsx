@@ -273,7 +273,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
         onSuccess: (response: { data: Trade; message: string }) => {
             toast.success(response.message || "Trade created successfully");
             queryClient.invalidateQueries({ queryKey: ["trades"] });
-            queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
             queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
             queryClient.invalidateQueries({ queryKey: ["client"] });
             queryClient.invalidateQueries({ queryKey: ["trade"] });
@@ -357,7 +356,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 const response = await updateTrade(editTradeId, updateRequest);
                 toast.success(response.message || "Trade updated successfully");
                 queryClient.invalidateQueries({ queryKey: ["trades"] });
-                queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
                 queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
                 queryClient.invalidateQueries({ queryKey: ["client"] });
                 queryClient.invalidateQueries({ queryKey: ["trade"] });
