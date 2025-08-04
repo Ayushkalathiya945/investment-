@@ -230,7 +230,7 @@ const ClientDetail: React.FC = () => {
                                 </div>
                             </Link>
                             <Link
-                                href={`/admin/brokerage?clientId=${client.id}`}
+                                href={`/admin/fees?clientId=${client.id}`}
                                 className="flex gap-2 items-center justify-center hover:bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer transition-colors"
                             >
                                 <span className="text-sm font-medium">Fees</span>

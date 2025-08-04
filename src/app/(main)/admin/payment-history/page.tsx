@@ -7,10 +7,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
-import type { ClientFilterRequest } from "@/types/client";
 import type { PaymentFilterRequest } from "@/types/payment";
 
-import { getAllClients } from "@/api/client";
+import { getAllClientsForDropdown } from "@/api/client";
 import { formatDateForPaymentApi, getAllPayments } from "@/api/payment";
 import AddPayment from "@/components/Dialoge/AddPayment";
 import { Button } from "@/components/ui/button";
@@ -50,8 +49,13 @@ const PaymentHistory: React.FC = () => {
         return undefined;
     });
 
-    const [clients, setClients] = useState<{ id: number; name: string }[]>([]);
-    const [isLoadingClients, setIsLoadingClients] = useState(false);
+    // Fetch clients for dropdown using useQuery
+    const { data: clients = [], isLoading: isLoadingClients } = useQuery<{ id: number; name: string }[]>({
+        queryKey: ["clientsDropdown"],
+        queryFn: getAllClientsForDropdown,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
+    });
 
     const updateUrlParams = useCallback(() => {
         const params = new URLSearchParams();
@@ -106,35 +110,6 @@ const PaymentHistory: React.FC = () => {
 
         return () => clearTimeout(timeoutId);
     }, [currentPage, selectedClientId, dateRange, updateUrlParams]);
-
-    // Fetch all clients for the dropdown
-    useEffect(() => {
-        async function fetchClients() {
-            setIsLoadingClients(true);
-            try {
-                const clientFilterParams: ClientFilterRequest = {
-                    page: 1,
-                    limit: 15,
-                };
-
-                const response = await getAllClients(clientFilterParams);
-                if (response && response.data) {
-                    const clientOptions = response.data.map(client => ({
-                        id: client.id,
-                        name: client.name,
-                    }));
-                    setClients(clientOptions);
-                }
-            } catch (error) {
-                console.error("Failed to load clients for filter:", error);
-                toast.error("Failed to load client filter options");
-            } finally {
-                setIsLoadingClients(false);
-            }
-        }
-
-        fetchClients();
-    }, []);
 
     const fromDateFormatted = dateRange?.from ? formatDateForPaymentApi(dateRange.from) : undefined;
     const toDateFormatted = dateRange?.to ? formatDateForPaymentApi(dateRange.to) : undefined;
@@ -348,7 +323,6 @@ const PaymentHistory: React.FC = () => {
                                                                 <TableCell>{formatDate(payment.paymentDate)}</TableCell>
                                                                 <TableCell>
                                                                     <div className="flex items-center gap-2">
-
                                                                         <Button
                                                                             className="h-8 bg-primary px-5 md:px-10 rounded-xl"
                                                                             onClick={() => handleEditPayment(payment.id)}
@@ -356,7 +330,6 @@ const PaymentHistory: React.FC = () => {
                                                                             <Pencil size={14} />
                                                                             <span className="hidden md:flex">Edit</span>
                                                                         </Button>
-
                                                                     </div>
                                                                 </TableCell>
                                                             </TableRow>
