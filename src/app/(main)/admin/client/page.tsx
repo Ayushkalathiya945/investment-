@@ -2,7 +2,7 @@
 import type { DateRange } from "react-day-picker";
 
 import { useQuery } from "@tanstack/react-query";
-import { BarChart2, ChartNoAxesCombined, IndianRupee, Loader2, Search, TrendingDown, Users } from "lucide-react";
+import { ChartNoAxesCombined, IndianRupee, Loader2, Search, TrendingDown, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
