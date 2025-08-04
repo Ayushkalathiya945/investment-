@@ -7,8 +7,6 @@ import { useParams, useRouter } from "next/navigation";
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 
-import type { AddClient as ClientType } from "@/types/client";
-
 import { deleteClient, getClientById } from "@/api/client";
 import AddClient from "@/components/Dialoge/AddClient";
 import AddPayment from "@/components/Dialoge/AddPayment";
@@ -21,7 +19,6 @@ const ClientDetail: React.FC = () => {
     const router = useRouter();
     const queryClient = useQueryClient();
     const clientId = Number(params.id);
-    const [editClientData, setEditClientData] = useState<ClientType | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const { data: client, isLoading, error } = useQuery({
@@ -48,20 +45,6 @@ const ClientDetail: React.FC = () => {
         if (clientId) {
             deleteClientMutation.mutate(clientId);
             setIsDeleteDialogOpen(false);
-        }
-    };
-
-    const handleEditClick = () => {
-        if (client) {
-            setEditClientData({
-                id: client.id.toString(),
-                name: client.name,
-                panNo: client.pan,
-                mobileNo: client.mobile,
-                email: client.email,
-                address: client.address,
-                purseAmount: client.purseAmount,
-            });
         }
     };
 
@@ -109,12 +92,21 @@ const ClientDetail: React.FC = () => {
                     <h1 className="text-xl sm:text-2xl font-bold text-black">{client.name}</h1>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
-                    <div onClick={handleEditClick} className="flex-1 sm:flex-none">
+                    <div className="flex-1 sm:flex-none">
                         <AddClient
                             name="Edit"
-                            data={editClientData || undefined}
+                            data={{
+                                id: client.id.toString(),
+                                name: client.name,
+                                panNo: client.pan,
+                                mobileNo: client.mobile,
+                                email: client.email,
+                                address: client.address,
+                                purseAmount: client.purseAmount,
+                            }}
                             onSuccess={handleEditSuccess}
                         />
+
                     </div>
                     <Button
                         variant="outline"

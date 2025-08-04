@@ -46,17 +46,6 @@ const AddClient: React.FC<AddClientProps> = ({
     const [isEditing, setIsEditing] = useState(false);
 
     const queryClient = useQueryClient();
-
-    const handleOpenChange = (newOpen: boolean) => {
-        setOpen(newOpen);
-
-        if (!newOpen) {
-            setTimeout(() => {
-                setIsEditing(false);
-            }, 300);
-        }
-    };
-
     const addClientForm = useForm<AddClientField>({
         defaultValues: {
             name: "",
@@ -70,6 +59,23 @@ const AddClient: React.FC<AddClientProps> = ({
         mode: "onSubmit",
     });
 
+    const handleOpenChange = (newOpen: boolean) => {
+        if (newOpen && data?.id) {
+            setIsEditing(true);
+            addClientForm.setValue("name", data.name || "");
+            addClientForm.setValue("panNo", data.panNo || "");
+            addClientForm.setValue("mobileNo", data.mobileNo || "");
+            addClientForm.setValue("email", data.email || "");
+            addClientForm.setValue("address", data.address || "");
+            addClientForm.setValue("purseAmount", data.purseAmount || 0);
+        } else if (!newOpen) {
+            setIsEditing(false);
+            addClientForm.reset();
+        }
+
+        setOpen(newOpen);
+    };
+
     // Setup the mutation for creating a client
     const createClientMutation = useMutation({
         mutationFn: (clientData: ClientCreateRequest) => createClient(clientData),
@@ -79,6 +85,7 @@ const AddClient: React.FC<AddClientProps> = ({
             setOpen(false);
 
             queryClient.invalidateQueries({ queryKey: ["clients"] });
+            queryClient.invalidateQueries({ queryKey: ["client"] });
             queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
             queryClient.invalidateQueries({ queryKey: ["clientsDropdown"] });
 
@@ -88,19 +95,16 @@ const AddClient: React.FC<AddClientProps> = ({
         onError: handleMutationError,
     });
 
-    // Setup the mutation for updating a client
     const updateClientMutation = useMutation({
         mutationFn: (clientData: ClientUpdateRequest) => updateClient(clientData),
         onSuccess: () => {
             toast.success("Client updated successfully");
-            addClientForm.reset();
             setOpen(false);
 
             queryClient.invalidateQueries({ queryKey: ["clients"] });
-            queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
             queryClient.invalidateQueries({ queryKey: ["client"] });
+            queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
             queryClient.invalidateQueries({ queryKey: ["clientsDropdown"] });
-
             if (onSuccess)
                 onSuccess();
         },
@@ -193,27 +197,27 @@ const AddClient: React.FC<AddClientProps> = ({
     };
 
     useEffect(() => {
-        if (open) {
-            if (data && data.id) {
-                const timer = setTimeout(() => {
-                    setIsEditing(true);
-                    addClientForm.setValue("name", data.name || "");
-                    addClientForm.setValue("panNo", data.panNo || "");
-                    addClientForm.setValue("mobileNo", data.mobileNo || "");
-                    addClientForm.setValue("email", data.email || "");
-                    addClientForm.setValue("address", data.address || "");
-                    addClientForm.setValue("purseAmount", data.purseAmount || undefined);
-                }, 0);
-
-                return () => clearTimeout(timer);
-            } else {
-                const timer = setTimeout(() => {
-                    setIsEditing(false);
-                    addClientForm.reset();
-                }, 0);
-
-                return () => clearTimeout(timer);
-            }
+        if (open && data && data.id) {
+            setIsEditing(true);
+            // Always reset first, then set new values
+            addClientForm.reset({
+                name: data.name || "",
+                panNo: data.panNo || "",
+                mobileNo: data.mobileNo || "",
+                email: data.email || "",
+                address: data.address || "",
+                purseAmount: data.purseAmount || 0,
+            });
+        } else if (open) {
+            setIsEditing(false);
+            addClientForm.reset({
+                name: "",
+                panNo: "",
+                mobileNo: "",
+                email: "",
+                address: "",
+                purseAmount: 0,
+            });
         }
     }, [open, data, addClientForm]);
 

@@ -291,7 +291,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 || error.isBrokerageConflict === true
             )) {
                 toast.error(error.message, {
-                    duration: 10000,
+                    duration: 8000,
                     icon: "🚫",
                     style: {
                         border: "2px solid #f43f5e",
