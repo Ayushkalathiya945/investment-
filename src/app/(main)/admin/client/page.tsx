@@ -216,18 +216,6 @@ const Client: React.FC = () => {
                 />
 
                 <StatCard
-                    icon={<BarChart2 />}
-                    value={typeof analytics.totalTradeAmount === "number"
-                        ? `₹${analytics.totalProfitAmount.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : "₹0"}
-                    label="Total Profit"
-                    isLoading={isLoadingAnalytics}
-                />
-
-                <StatCard
                     icon={<IndianRupee />}
                     value={typeof analytics.totalFeesAmount === "number"
                         ? `₹${analytics.totalFeesAmount.toLocaleString("en-IN", {

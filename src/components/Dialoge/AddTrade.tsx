@@ -1078,7 +1078,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                             type="button"
                             className="bg-primary text-sm px-8 rounded-xl"
                             onClick={tradeForm.handleSubmit(onSubmit)}
-                            disabled={tradeForm.formState.isSubmitting || createTradeMutation.isPending || loadingTradeDetails}
+                            disabled={tradeForm.formState.isSubmitting || createTradeMutation.isPending || loadingTradeDetails }
                         >
                             {createTradeMutation.isPending
                                 ? "Saving..."

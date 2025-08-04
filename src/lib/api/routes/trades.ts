@@ -63,6 +63,9 @@ async function createTradeAllocationsForSell(sellTrade: Trade, tx?: TransactionT
 
     if (remainingToAllocate > 0) {
         console.warn(`Could not fully allocate sell trade ${sellTrade.id}. Remaining quantity: ${remainingToAllocate}`);
+        throw new HTTPException(400, {
+            message: `Could not fully allocate sell trade of ${sellTrade.symbol} - ${sellTrade.exchange} . You need ${remainingToAllocate} more shares .`,
+        });
     }
 
     return buyAmount;
