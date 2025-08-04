@@ -957,7 +957,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                             </div>
 
                                             <div className="flex flex-col md:flex-row w-full gap-4 items-center">
-                                                <div className="w-full px-1">
+                                                {/* <div className="w-full px-1">
                                                     <FormField
                                                         control={tradeForm.control}
                                                         name="tradeDate"
@@ -982,7 +982,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                             </FormItem>
                                                         )}
                                                     />
-                                                </div>
+                                                </div> */}
 
                                                 <div className="w-full">
                                                     <FormField
