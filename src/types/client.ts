@@ -28,7 +28,6 @@ export type AddClient = {
     purseAmount?: number;
 };
 
-// Types for client API responses
 export type Client = {
     id: number;
     name: string;
@@ -39,7 +38,8 @@ export type Client = {
     purseAmount: number;
     createdAt?: string;
     updatedAt?: string;
-    // Client detail additional fields
+
+    totalNetAmount?: number;
     totalTradeAmount?: number;
     totalBrokerageAmount?: number;
     totalPaymentAmount?: number;

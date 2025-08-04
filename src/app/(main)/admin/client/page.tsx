@@ -18,12 +18,10 @@ import RangeDatePicker from "@/components/ui/rangeDatePicker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PAGE_LIMIT } from "@/lib/constants";
 
-// Helper function to format date as YYYY-MM-DD in local timezone
 function formatDateToYYYYMMDD(date: Date | undefined): string | undefined {
     if (!date)
         return undefined;
 
-    // Format date in local timezone to avoid UTC conversion issues
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -35,7 +33,6 @@ const Client: React.FC = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Extract query parameters
     const initialPage = searchParams.get("page") ? Number.parseInt(searchParams.get("page") as string, 10) : 1;
     const initialSearch = searchParams.get("search") || "";
     const initialStartDate = searchParams.get("startDate") || undefined;
@@ -45,10 +42,8 @@ const Client: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [clientsData, setClientsData] = useState<Client[]>([]);
 
-    // Track if search is being performed
     const [isSearching, setIsSearching] = useState(false);
 
-    // Set up date range from URL params if available
     const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
         if (initialStartDate && initialEndDate) {
             return {
@@ -59,7 +54,6 @@ const Client: React.FC = () => {
         return undefined;
     });
 
-    // Update URL with current filters
     const updateUrlParams = useCallback(() => {
         const params = new URLSearchParams();
 
@@ -83,7 +77,6 @@ const Client: React.FC = () => {
         router.push(newUrl, { scroll: false });
     }, [currentPage, searchTerm, dateRange, router]);
 
-    // Debounce search to prevent too many API calls
     useEffect(() => {
         const timer = setTimeout(() => {
             setIsSearching(false);
@@ -93,14 +86,12 @@ const Client: React.FC = () => {
         return () => clearTimeout(timer);
     }, [searchTerm, updateUrlParams]);
 
-    // Update URL when filters change (except search which is debounced)
     useEffect(() => {
         if (!isSearching) {
             updateUrlParams();
         }
     }, [currentPage, dateRange, isSearching, updateUrlParams]);
 
-    // Prepare filter params for API calls
     const filterParams: ClientFilterRequest = {
         page: currentPage,
         limit: PAGE_LIMIT,
@@ -109,20 +100,17 @@ const Client: React.FC = () => {
         to: formatDateToYYYYMMDD(dateRange?.to),
     };
 
-    // Fetch clients data
     const { data: clientsResponse, isLoading: isLoadingClients, isFetching: isFetchingClients, error: clientsError } = useQuery({
         queryKey: ["clients", filterParams],
         queryFn: () => getAllClients(filterParams),
         refetchOnWindowFocus: false,
     });
 
-    // Update local clients data when API response changes
     useEffect(() => {
         let mounted = true;
         if (clientsResponse?.data && mounted) {
-            // Use a local variable first to avoid direct setState in useEffect
             const newData = clientsResponse.data;
-            // Assign setTimeout to a variable for proper cleanup
+
             const timer = setTimeout(() => {
                 if (mounted) {
                     setClientsData(newData);
@@ -139,21 +127,18 @@ const Client: React.FC = () => {
         };
     }, [clientsResponse]);
 
-    // Use server-side filtered data directly
     const filteredClients = useMemo(() => {
         return clientsData;
     }, [clientsData]);
 
-    // Fetch analytics data
     const { data: analyticsResponse, isLoading: isLoadingAnalytics, error: analyticsError } = useQuery({
         queryKey: ["clientAnalytics", filterParams],
         queryFn: () => getClientAnalytics(filterParams),
         refetchOnWindowFocus: false,
-        // Don't fail the query on error - we'll handle it gracefully
+
         retry: false,
     });
 
-    // Handle errors
     useEffect(() => {
         if (clientsError) {
             const errorMessage = (clientsError as any)?.error?.issues?.[0]?.message
@@ -163,47 +148,30 @@ const Client: React.FC = () => {
         }
 
         if (analyticsError) {
-            // Just log analytics errors, don't show to user since it's not critical
             console.error("Analytics error:", analyticsError);
         }
     }, [clientsError, analyticsError]);
 
     const handleDateChange = (date: DateRange) => {
-        // console.log("handleDateChange received:", date);
-
         if (date?.from && date?.to) {
-            // Create new Date objects to avoid mutating the original dates
             const startDate = new Date(date.from);
             startDate.setHours(0, 0, 0, 0);
 
-            // Set time components without modifying the date part
             const endDate = new Date(date.to);
             endDate.setHours(23, 59, 59, 999);
 
-            // console.log("Setting date range:", {
-            //     from: startDate.toDateString(),
-            //     to: endDate.toDateString(),
-            // });
-
             setDateRange({ from: startDate, to: endDate });
         } else {
-            // Clear date range completely when either date is undefined
-            // console.log("Clearing date range");
             setDateRange(undefined);
         }
 
-        // Reset to first page when date filter changes
         setCurrentPage(1);
     };
 
-    // Get total pages from API response
     const totalPages = clientsResponse?.metadata?.total
         ? Math.ceil(clientsResponse.metadata.total / PAGE_LIMIT)
         : 1;
 
-    // filteredClients is already declared and used in the component
-
-    // Analytics data with safe defaults
     const analytics = {
         totalClient: analyticsResponse?.data?.totalClient || 0,
         totalTradeAmount: analyticsResponse?.data.totalValue || 0,

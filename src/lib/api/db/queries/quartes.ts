@@ -4,10 +4,8 @@ import { db } from "@/lib/api/db";
 
 import { quarters } from "../schema";
 
-// Type for creating a new quarter
 type CreateQuarter = typeof quarters.$inferInsert;
 
-// Type for updating a quarter
 type UpdateQuarter = Partial<CreateQuarter>;
 
 export async function create(quarterData: CreateQuarter) {

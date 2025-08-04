@@ -12,7 +12,6 @@ import { quarters as quartersTable } from "../db/schema";
 
 const quarter = new Hono();
 
-// Create quarters for a year (all 4 quarters at once)
 quarter.post(
     "/create",
     zValidator("json", createQuarterSchema),
@@ -20,7 +19,6 @@ quarter.post(
         const { year, quarters: quartersData } = await c.req.valid("json");
 
         try {
-            // Check if any quarter already exists for this year
             const existingQuarters = await Promise.all(
                 quartersData.map(q =>
                     getByYearAndQuarter(year, q.quarterNumber),
@@ -32,7 +30,6 @@ quarter.post(
                 throw new HTTPException(400, { message: "One or more quarters already exist for this year" });
             }
 
-            // Create all quarters in a transaction
             const createdQuarters = await Promise.all(
                 quartersData.map(q => create({
                     year,
@@ -55,7 +52,6 @@ quarter.post(
     },
 );
 
-// Update all quarters for a specific year
 quarter.put(
     "/update/:year",
     zValidator("param", z.object({
@@ -67,7 +63,6 @@ quarter.put(
         const { year: requestYear, quarters } = c.req.valid("json");
         const yearNum = Number.parseInt(year);
 
-        // Ensure the year in params matches the one in the body
         if (yearNum !== requestYear) {
             throw new HTTPException(400, {
                 message: "Year in URL does not match year in request body",
@@ -75,13 +70,11 @@ quarter.put(
         }
 
         try {
-            // Get existing quarters for this year
             const existingQuarters = await db
                 .select()
                 .from(quartersTable)
                 .where(eq(quartersTable.year, yearNum));
 
-            // Update existing quarters
             const updatePromises = quarters.map((q) => {
                 const existingQuarter = existingQuarters.find(
                     eqQ => eqQ.quarterNumber === q.quarterNumber,
@@ -92,7 +85,6 @@ quarter.put(
                         daysInQuarter: q.daysInQuarter,
                     });
                 } else {
-                    // If quarter doesn't exist, create it
                     return create({
                         year: yearNum,
                         quarterNumber: q.quarterNumber,
@@ -117,7 +109,6 @@ quarter.put(
     },
 );
 
-// Get quarters by year
 quarter.get(
     "/year/:year",
     zValidator("param", z.object({
@@ -147,7 +138,6 @@ quarter.get(
     },
 );
 
-// Get a specific quarter by year and quarter number
 quarter.get(
     "/:year/:quarterNumber",
     zValidator("param", z.object({

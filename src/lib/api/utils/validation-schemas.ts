@@ -73,9 +73,8 @@ export const updateTradeSchema = tradeSchema.partial().extend({
 export const paymentSchema = z.object({
     clientId: z.number().int().positive("Client ID must be positive"),
     amount: z.number().positive("Amount must be positive"),
-    description: z.string().optional(),
     paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    notes: z.string().optional(),
+    description: z.string().optional(),
 });
 
 export const updatePaymentSchema = paymentSchema.partial();

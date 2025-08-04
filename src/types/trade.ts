@@ -42,7 +42,7 @@ export type TradeResponse = {
     message: string;
     data: Trade | {
         trade: Trade;
-        fifoInfo?: any[];
+        currentHolding?: number;
     };
     error?: {
         issues?: Array<{ path: string; message: string }>;
@@ -90,7 +90,6 @@ export type UpdateTradeRequest = {
     notes?: string;
 };
 
-// Request type for filtering trades
 export type TradeFilterRequest = {
     clientId?: number;
     stockSymbol?: string;

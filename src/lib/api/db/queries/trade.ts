@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, lte, sql } from "drizzle-orm";
 
 import type { TransactionType } from "../";
 import type { NewTrade } from "../schema";
@@ -68,11 +68,10 @@ export async function findAllWithPagination(data: { page: number; limit: number;
         },
     });
 
-    // Transform the result to include clientName directly in the trade object
     const tradesWithClientName = tradesData.map((trade: any) => ({
         ...trade,
         clientName: trade.client?.name || "Unknown Client",
-        client: undefined, // Remove the nested client object
+        client: undefined,
     }));
 
     const tradeCount = await getDB(tx)
@@ -107,14 +106,11 @@ export async function calculateTotalTradeAmount(data: { clientId?: number; from?
 export async function calculateTotalSoldAmount(data: { clientId?: number; from?: number; to?: number }, tx?: TransactionType) {
     const conditions = [];
 
-    // Add condition for client ID if provided
     if (data.clientId)
         conditions.push(eq(trades.clientId, data.clientId));
 
-    // Add condition for trade type = SELL
     conditions.push(eq(trades.type, TradeType.SELL));
 
-    // Add date range conditions if provided
     if (data.from)
         conditions.push(gte(trades.tradeDate, new Date(data.from)));
     if (data.to)
@@ -123,7 +119,6 @@ export async function calculateTotalSoldAmount(data: { clientId?: number; from?:
     if (conditions.length === 0)
         return 0;
 
-    // Calculate the total net amount of all SELL trades
     const totalSoldAmount = await getDB(tx)
         .select({ totalAmount: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)` })
         .from(trades)
@@ -144,24 +139,19 @@ export async function findBuyTradesWithRemainingQuantity(data: {
             eq(trades.symbol, data.symbol),
             eq(trades.exchange, data.exchange),
             eq(trades.type, TradeType.BUY),
-            eq(trades.isFullySold, 0),
+            gt(trades.remainingQuantity, 0),
             lte(trades.tradeDate, new Date(data.tradeDate)),
         ),
-        orderBy: [trades.tradeDate],
+        orderBy: [trades.tradeDate, trades.id],
     });
 }
 
-/**
- * Get all active BUY trades for a client (with remaining quantity)
- * @param clientId Client ID to get trades for
- * @returns Array of trade records with remaining quantity
- */
 export async function getActiveBuyTrades(clientId: number, tx?: TransactionType) {
     return getDB(tx).query.trades.findMany({
         where: and(
             eq(trades.clientId, clientId),
             eq(trades.type, TradeType.BUY),
-            eq(trades.isFullySold, 0), // Not fully sold
+            gt(trades.remainingQuantity, 0),
         ),
     });
 }
@@ -185,4 +175,22 @@ export async function getTradeById(tradeId: number, tx?: TransactionType) {
     return getDB(tx).query.trades.findFirst({
         where: eq(trades.id, tradeId),
     });
+}
+
+export async function currentHoldingAmount(clientId: number, tx?: TransactionType) {
+    const db = getDB(tx);
+
+    const currentHoldingAmount = await db
+        .select({
+            currentHoldingAmount: sql<number>`COALESCE(SUM(
+                CASE 
+                  WHEN ${trades.type} = 'BUY' THEN ${trades.remainingQuantity} * ${trades.price}
+                  ELSE 0
+                END
+              ), 0)`,
+        })
+        .from(trades)
+        .where(eq(trades.clientId, clientId));
+
+    return currentHoldingAmount[0]?.currentHoldingAmount || 0;
 }

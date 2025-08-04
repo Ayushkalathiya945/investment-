@@ -29,7 +29,6 @@ const TradePage: React.FC = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Get filter values from URL query params
     const clientIdParam = searchParams.get("clientId");
     const symbolParam = searchParams.get("symbol");
     const typeParam = searchParams.get("type") as "BUY" | "SELL" | "";
@@ -37,7 +36,6 @@ const TradePage: React.FC = () => {
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
 
-    // Parse dates from URL if they exist
     const startDate = startDateParam ? new Date(startDateParam) : undefined;
     const endDate = endDateParam ? new Date(endDateParam) : undefined;
 
@@ -54,28 +52,23 @@ const TradePage: React.FC = () => {
     const [clients, setClients] = useState<ClientDropdownItem[]>([]);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
 
-    // State to track which trade is being edited
     const [editTradeId, setEditTradeId] = useState<number | undefined>();
     const [showEditDialog, setShowEditDialog] = useState(false);
 
-    // Function to handle edit button click
     const handleEditTrade = (tradeId: number) => {
         setEditTradeId(tradeId);
         setShowEditDialog(true);
     };
 
-    // Function to handle dialog close
     const handleDialogOpenChange = (open: boolean) => {
         setShowEditDialog(open);
         if (!open) {
-            // Reset the edit trade ID when dialog is closed
             setTimeout(() => {
                 setEditTradeId(undefined);
-            }, 300); // Small delay to ensure dialog animation completes
+            }, 300);
         }
     };
 
-    // Update URL with current filters
     const updateUrlWithFilters = useCallback(() => {
         const params = new URLSearchParams();
         if (clientId)
@@ -98,7 +91,6 @@ const TradePage: React.FC = () => {
         updateUrlWithFilters();
     }, [updateUrlWithFilters]);
 
-    // Fetch clients for dropdown
     useEffect(() => {
         const fetchClients = async () => {
             setIsLoadingClients(true);
@@ -128,7 +120,6 @@ const TradePage: React.FC = () => {
         ...(tradeType && { type: tradeType }),
     };
 
-    // Fetch trades with React Query
     const {
         data: tradesResponse,
         isLoading,
@@ -139,16 +130,11 @@ const TradePage: React.FC = () => {
     } = useQuery({
         queryKey: ["trades", filterParams],
         queryFn: () => getAllTrades(filterParams),
-        staleTime: 30000, // 30 seconds
+        staleTime: 30000,
     });
 
-    // Log the response for debugging
-    // console.log("Trades response:", tradesResponse);
-
-    // Get trade data and pagination from response
     const trades = tradesResponse?.data || [];
 
-    // Access pagination data - API returns pagination mapped from metadata
     const pagination = (tradesResponse as any)?.pagination || {
         total: 0,
         currentPage,
@@ -156,7 +142,6 @@ const TradePage: React.FC = () => {
         totalPages: 0,
     };
 
-    // Filter trades by search term client name or stock symbol
     const filteredTrades = trades.filter((trade) => {
         if (!searchTerm)
             return true;
@@ -168,18 +153,15 @@ const TradePage: React.FC = () => {
         );
     });
 
-    // Handle date range changes
     const handleDateChange = (range: MonthRange) => {
         setDateRange(range);
         setCurrentPage(1);
     };
 
-    // Handle page change
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
     };
 
-    // Handle trade type filter
     const handleTradeTypeChange = (value: string) => {
         if (value === "ALL") {
             setTradeType("");
@@ -191,7 +173,7 @@ const TradePage: React.FC = () => {
 
     function formatDate(date: Date): string {
         const dd = String(date.getDate()).padStart(2, "0");
-        const mm = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-indexed
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
         const yyyy = date.getFullYear();
         return `${dd}/${mm}/${yyyy}`;
     }
@@ -238,7 +220,6 @@ const TradePage: React.FC = () => {
                         onSuccess={() => refetch()}
                     />
 
-                    {/* Separate dialog for editing trades */}
                     {editTradeId && (
                         <AddTrade
                             name="Edit Trade"

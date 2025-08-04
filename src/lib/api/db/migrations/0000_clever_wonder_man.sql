@@ -27,6 +27,7 @@ CREATE TABLE `clients` (
 	`mobile` text NOT NULL,
 	`address` text,
 	`purse_amount` real DEFAULT 0 NOT NULL,
+	`current_holdings` real DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -40,7 +41,6 @@ CREATE TABLE `daily_brokerage` (
 	`date` integer NOT NULL,
 	`holding_amount` real DEFAULT 0 NOT NULL,
 	`unused_amount` real DEFAULT 0 NOT NULL,
-	`daily_rate` real,
 	`daily_holding_rate` real NOT NULL,
 	`daily_unused_rate` real NOT NULL,
 	`days_in_quarter` integer,
@@ -54,39 +54,23 @@ CREATE TABLE `daily_brokerage` (
 --> statement-breakpoint
 CREATE INDEX `daily_client_date_idx` ON `daily_brokerage` (`client_id`,`date`);--> statement-breakpoint
 CREATE UNIQUE INDEX `daily_brokerage_client_id_date_unique` ON `daily_brokerage` (`client_id`,`date`);--> statement-breakpoint
-CREATE TABLE `fifo_allocations` (
+CREATE TABLE `holdings` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`sell_trade_id` integer NOT NULL,
-	`buy_trade_id` integer NOT NULL,
 	`client_id` integer NOT NULL,
 	`symbol` text NOT NULL,
 	`exchange` text NOT NULL,
-	`quantity_allocated` integer NOT NULL,
-	`buy_price` real NOT NULL,
-	`sell_price` real NOT NULL,
-	`buy_date` integer NOT NULL,
-	`sell_date` integer NOT NULL,
-	`buy_value` real NOT NULL,
-	`sell_value` real NOT NULL,
-	`profit_loss` real NOT NULL,
-	`holding_days` integer NOT NULL,
+	`holding` real NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`sell_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`buy_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade,
+	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `fifo_client_symbol_idx` ON `fifo_allocations` (`client_id`,`symbol`,`exchange`);--> statement-breakpoint
-CREATE INDEX `sell_trade_idx` ON `fifo_allocations` (`sell_trade_id`);--> statement-breakpoint
-CREATE INDEX `buy_trade_idx` ON `fifo_allocations` (`buy_trade_id`);--> statement-breakpoint
 CREATE TABLE `payments` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`client_id` integer NOT NULL,
 	`amount` real NOT NULL,
-	`payment_type` text DEFAULT 'other' NOT NULL,
 	`description` text,
 	`payment_date` integer NOT NULL,
-	`notes` text,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -114,6 +98,18 @@ CREATE TABLE `stocks` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `stocks_symbol_exchange_unique` ON `stocks` (`symbol`,`exchange`);--> statement-breakpoint
+CREATE TABLE `trade_allocations` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`sell_trade_id` integer NOT NULL,
+	`buy_trade_id` integer NOT NULL,
+	`quantity_allocated` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`sell_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`buy_trade_id`) REFERENCES `trades`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `sell_trade_idx` ON `trade_allocations` (`sell_trade_id`);--> statement-breakpoint
+CREATE INDEX `buy_trade_idx` ON `trade_allocations` (`buy_trade_id`);--> statement-breakpoint
 CREATE TABLE `trades` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`client_id` integer NOT NULL,
@@ -124,10 +120,7 @@ CREATE TABLE `trades` (
 	`price` real NOT NULL,
 	`trade_date` integer NOT NULL,
 	`net_amount` real NOT NULL,
-	`original_quantity` integer NOT NULL,
 	`remaining_quantity` integer NOT NULL,
-	`is_fully_sold` integer DEFAULT 0 NOT NULL,
-	`sell_processed` integer DEFAULT 0 NOT NULL,
 	`notes` text,
 	`brokerage_calculated_date` integer,
 	`created_at` integer NOT NULL,
@@ -137,7 +130,6 @@ CREATE TABLE `trades` (
 --> statement-breakpoint
 CREATE INDEX `client_symbol_idx` ON `trades` (`client_id`,`symbol`,`exchange`);--> statement-breakpoint
 CREATE INDEX `trade_date_idx` ON `trades` (`trade_date`);--> statement-breakpoint
-CREATE INDEX `fifo_idx` ON `trades` (`type`,`is_fully_sold`,`trade_date`);--> statement-breakpoint
 CREATE TABLE `unused_amounts` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`client_id` integer NOT NULL,

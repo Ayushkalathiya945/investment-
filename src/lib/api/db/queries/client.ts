@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, lte, or, sql } from "drizzle-orm";
 
 import type { TransactionType } from "../index";
 import type { NewClient } from "../schema";
@@ -86,7 +86,6 @@ export async function findAllWithPagination(data: {
         ));
     }
 
-    // Filter by creation date if provided
     if (data.from) {
         conditions.push(gte(clients.createdAt, data.from));
     }
@@ -131,7 +130,6 @@ export async function calculateTotalClient(data: { from?: number; to?: number },
     return totalClient && totalClient.length > 0 ? totalClient[0].count : 0;
 }
 
-// Get all clients id and name
 export async function getAllClientsIdAndName(tx?: TransactionType) {
     const clientsData = await getDB(tx)
         .select({ id: clients.id, name: clients.name })
@@ -140,10 +138,6 @@ export async function getAllClientsIdAndName(tx?: TransactionType) {
     return clientsData;
 }
 
-/**
- * Get all clients (optimized for brokerage calculation)
- * @returns All clients in the database
- */
 export async function getAllClients(tx?: TransactionType) {
     return getDB(tx).query.clients.findMany();
 }
@@ -160,8 +154,6 @@ export async function calculateFinancialTotalsByDateRange(
             ? new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999)
             : null;
 
-        // console.log("Calculating financial totals for date range:", { from, to, endOfDayTo });
-
         // Total client count
         const clientCountQuery = db
             .select({ count: sql<number>`COUNT(${clients.id})` })
@@ -174,21 +166,14 @@ export async function calculateFinancialTotalsByDateRange(
 
         const baseConditions = [
             eq(trades.type, TradeType.BUY),
-            eq(trades.isFullySold, 0),
+            gt(trades.remainingQuantity, 0),
         ];
-
-        // if (from && to) {
-        //     baseConditions.push(
-        //         gte(trades.tradeDate, new Date(from).getTime()),
-        //         lte(trades.tradeDate, endOfDayTo!.getTime()),
-        //     );
-        // }
 
         const portfolioValueQuery = db
             .select({
                 totalValue: sql<number>`COALESCE(SUM(
       CASE 
-        WHEN ${trades.type} = 'BUY' AND ${trades.isFullySold} = 0 
+        WHEN ${trades.type} = 'BUY' AND ${trades.remainingQuantity} > 0 
         THEN ${trades.remainingQuantity} * ${trades.price}
         ELSE 0
       END
@@ -196,26 +181,6 @@ export async function calculateFinancialTotalsByDateRange(
             })
             .from(trades)
             .where(and(...baseConditions));
-
-        // Brokerage
-        // const brokerageQuery = db
-        //     .select({
-        //         totalBrokerage: sql<number>`COALESCE(SUM(${brokerages.brokerageAmount}), 0)`,
-        //     })
-        //     .from(brokerages);
-
-        // if (from) {
-        //     const fromMonth = from.getMonth() + 1;
-        //     if (fromMonth !== null) {
-        //         brokerageQuery.where(gte(brokerages.month, fromMonth));
-        //     }
-        // }
-        // if (to) {
-        //     const toMonth = to.getMonth() + 1;
-        //     if (toMonth !== null) {
-        //         brokerageQuery.where(lte(brokerages.month, toMonth));
-        //     }
-        // }
 
         const fees = db.select({
             totalFees: sql<number>`COALESCE(SUM(${dailyBrokerage.totalDailyBrokerage}), 0)`,
@@ -247,13 +212,6 @@ export async function calculateFinancialTotalsByDateRange(
             .from(trades)
             .where(eq(trades.type, TradeType.BUY));
 
-        // Only apply the end date filter
-        // We don't filter by from date because we need all BUY transactions up to the end date
-        // if (to)
-        //     buyTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
-
-        // Get total SELL trades value up to the end date (not limited by start date)
-        // For accurate purse amount calculation, we need ALL sell trades up to the end date
         const sellTradesQuery = db
             .select({
                 totalSellTrades: sql<number>`COALESCE(SUM(${trades.netAmount}), 0)`,
@@ -261,14 +219,6 @@ export async function calculateFinancialTotalsByDateRange(
             .from(trades)
             .where(eq(trades.type, TradeType.SELL));
 
-        // Only apply the end date filter
-        // We don't filter by from date because we need all SELL transactions up to the end date
-        // if (to)
-        //     sellTradesQuery.where(lte(trades.tradeDate, endOfDayTo!.getTime()));
-
-        // Get total purse amount (initial value from all clients)
-        // We don't filter the purse amount by date because it represents the initial amount
-        // The remaining amount will be calculated by adjusting this with buy/sell trades
         const purseAmountQuery = db
             .select({
                 totalPurseAmount: sql<number>`COALESCE(SUM(${clients.purseAmount}), 0)`,
@@ -296,7 +246,6 @@ export async function calculateFinancialTotalsByDateRange(
             totalFees: Number(feesResult[0]?.totalFees || 0),
         };
 
-        // console.log("Financial totals calculated:", result);
         return result;
     } catch (error) {
         console.error("Error calculating financial totals:", error);
@@ -311,4 +260,44 @@ export async function calculateFinancialTotalsByDateRange(
             totalPurseAmount: 0,
         };
     }
+}
+
+export async function updateCurrentHoldingAmount(clientId: number, amount: number, tx?: TransactionType) {
+    const db = getDB(tx);
+
+    await db
+        .update(clients)
+        .set({
+            currentHoldings: sql<number>`current_holdings + ${amount}`,
+        })
+        .where(eq(clients.id, clientId))
+        .returning();
+}
+
+// calculte current holding amount from tread table
+export async function getAndUpdateCurrentTotalHoldingAmount(clientId: number, tx?: TransactionType) {
+    const db = getDB(tx);
+
+    const currentHoldingAmount = await db
+        .select({
+            currentHoldingAmount: sql<number>`
+      COALESCE(SUM(
+        CASE 
+          WHEN ${trades.type} = 'SELL' THEN ${trades.netAmount}
+          WHEN ${trades.type} = 'BUY' THEN -${trades.netAmount}
+          ELSE 0
+        END
+      ), 0)
+    `,
+        })
+        .from(trades)
+        .where(eq(trades.clientId, clientId));
+
+    const amount = currentHoldingAmount[0]?.currentHoldingAmount || 0;
+
+    await db.update(clients)
+        .set({
+            currentHoldings: amount,
+        })
+        .where(eq(clients.id, clientId));
 }

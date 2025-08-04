@@ -9,7 +9,7 @@ import AuthGuard from "@/components/AuthGuard";
 import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BROKERAGE, CLIENT, PAYMENT_HISTORY, SETTING, TRADE } from "@/lib/constants";
+import { CLIENT, FEES, PAYMENT_HISTORY, SETTING, TRADE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +29,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const navigation = [
         { name: "Client", href: CLIENT, icon: Users },
         { name: "Trade", href: TRADE, icon: ChartNoAxesCombined },
-        { name: "Fees", href: BROKERAGE, icon: ChartLine },
+        { name: "Fees", href: FEES, icon: ChartLine },
         { name: "Payment History", href: PAYMENT_HISTORY, icon: CreditCard },
         { name: "Settings", href: SETTING, icon: Settings },
     ];

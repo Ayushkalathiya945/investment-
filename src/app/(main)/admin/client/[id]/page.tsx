@@ -12,7 +12,6 @@ import type { AddClient as ClientType } from "@/types/client";
 import { deleteClient, getClientById } from "@/api/client";
 import AddClient from "@/components/Dialoge/AddClient";
 import AddPayment from "@/components/Dialoge/AddPayment";
-import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -24,7 +23,6 @@ const ClientDetail: React.FC = () => {
     const [editClientData, setEditClientData] = useState<ClientType | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-    // Fetch client data
     const { data: client, isLoading, error } = useQuery({
         queryKey: ["client", clientId],
         queryFn: () => getClientById(clientId),
@@ -32,14 +30,11 @@ const ClientDetail: React.FC = () => {
         enabled: !Number.isNaN(clientId),
     });
 
-    // Delete client mutation
     const deleteClientMutation = useMutation({
         mutationFn: (id: number) => deleteClient(id),
         onSuccess: () => {
             toast.success("Client deleted successfully");
-            // Navigate back to clients list
             router.push("/admin/client");
-            // Invalidate client queries to refresh the list
             queryClient.invalidateQueries({ queryKey: ["clients"] });
             queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
         },
@@ -48,7 +43,6 @@ const ClientDetail: React.FC = () => {
         },
     });
 
-    // Handle delete confirmation
     const handleDeleteClient = async () => {
         if (clientId) {
             deleteClientMutation.mutate(clientId);
@@ -56,7 +50,6 @@ const ClientDetail: React.FC = () => {
         }
     };
 
-    // Prepare client data for editing
     const handleEditClick = () => {
         if (client) {
             setEditClientData({
@@ -71,18 +64,14 @@ const ClientDetail: React.FC = () => {
         }
     };
 
-    // Handle successful client edit
     const handleEditSuccess = () => {
-        // Refetch client data after edit
         queryClient.invalidateQueries({ queryKey: ["client", clientId] });
     };
 
-    // Go back to clients page
     const handleBackClick = () => {
         router.push("/admin/client");
     };
 
-    // Show loading state
     if (isLoading) {
         return (
             <div className="flex justify-center items-center w-full min-h-[94vh]">
@@ -94,7 +83,6 @@ const ClientDetail: React.FC = () => {
         );
     }
 
-    // Show error state
     if (error || !client) {
         return (
             <div className="flex flex-col items-center justify-center w-full min-h-[94vh] gap-4">
@@ -106,141 +94,169 @@ const ClientDetail: React.FC = () => {
 
     return (
         <div className="flex flex-col w-full min-h-[94vh] gap-5">
-            <div className="flex-col md:flex md:flex-row justify-between w-full">
-                <div className="flex gap-2 items-center">
-                    <div
-                        className="flex items-center shrink-0 justify-center border border-border bg-white text-sm hover:bg-secondary text-primary rounded-full w-10 h-10 cursor-pointer"
-                        onClick={handleBackClick}
-                    >
-                        <ChevronLeft size={20} />
-                    </div>
-                    <h1 className="text-xl font-semibold ">{client.name}</h1>
-                </div>
-
-                <div className="flex-col md:flex md:flex-row gap-2 mt-3 md:mt-0">
-
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full px-5 py-5 gap-4">
+                <div className="flex items-center gap-3">
                     <Button
-                        className="ml-auto mx-3 md:mx-0 bg-transparent shadow-none text-red-400 border border-red-300 hover:bg-red-50 px-10 rounded-xl"
-                        onClick={() => setIsDeleteDialogOpen(true)}
-                        disabled={deleteClientMutation.isPending}
+                        variant="outline"
+                        size="icon"
+                        onClick={handleBackClick}
+                        className="h-8 w-8"
                     >
-                        {deleteClientMutation.isPending ? "Deleting..." : "Delete"}
+                        <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <div onClick={handleEditClick}>
+                    <h1 className="text-xl sm:text-2xl font-bold text-black">{client.name}</h1>
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <div onClick={handleEditClick} className="flex-1 sm:flex-none">
                         <AddClient
                             name="Edit"
                             data={editClientData || undefined}
                             onSuccess={handleEditSuccess}
                         />
                     </div>
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsDeleteDialogOpen(true)}
+                        className="flex items-center bg-stone-50 gap-2 flex-1 sm:flex-none border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-6 py-3 text-sm sm:text-base"
+                    >
+                        Delete
+                    </Button>
+
                 </div>
             </div>
-            <div className="grid lg:grid-cols-5 md:grid-cols-2 grid-cols-1 justify-between gap-3 px-2">
-                <StatCard
-                    icon={<IndianRupee />}
-                    value={typeof client.totalTradeAmount === "number"
-                        ? `₹${client.totalTradeAmount.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : "₹0"}
-                    label="Total Portfolio Value"
-                    isLoading={isLoading}
-                />
-                <StatCard
-                    icon={<Wallet />}
-                    value={typeof client.purseAmount === "number"
-                        ? `₹${client.purseAmount.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : "₹0"}
-                    label="Initial Purse Amount"
-                    isLoading={isLoading}
-                />
-                {/* Show remaining purse amount from API */}
-                <StatCard
-                    icon={<Wallet />}
-                    value={typeof client.remainingPurseAmount === "number"
-                        ? `₹${client.remainingPurseAmount.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : "₹0"}
-                    label="Remaining Purse Amount"
-                    isLoading={isLoading}
-                />
-                {/* Display total sold stock amount */}
-                {/* <StatCard
-                    icon={<TrendingUp />}
-                    value={typeof client.totalSoldAmount === "number" ?
-                        `₹${client.totalSoldAmount.toLocaleString("en-IN")}` : "₹0"}
-                    label="Sold Stock Amount"
-                    isLoading={isLoading}
-                /> */}
-                <StatCard
-                    icon={<TrendingUp />}
-                    value={typeof client.totalBrokerageAmount === "number"
-                        ? `₹${client.totalBrokerageAmount.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : "₹0"}
-                    label="Total Fees"
-                    isLoading={isLoading}
-                />
-                <StatCard
-                    icon={<CreditCard />}
-                    value={typeof client.totalPaymentAmount === "number"
-                        ? `₹${client.totalPaymentAmount.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : "₹0"}
-                    label="Total Payments"
-                    isLoading={isLoading}
-                />
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-5">
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-500 truncate">Total Portfolio Value</p>
+                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
+                                ₹
+                                {client.totalTradeAmount?.toLocaleString() || "0"}
+                            </p>
+                        </div>
+                        <div className="ml-4 flex-shrink-0">
+                            <div className="bg-blue-50 p-2 rounded-lg">
+                                <IndianRupee className="h-5 w-5 text-blue-600" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-500 truncate">Net Amount</p>
+                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
+                                ₹
+                                {client.totalNetAmount?.toLocaleString() || "0"}
+                            </p>
+                        </div>
+                        <div className="ml-4 flex-shrink-0">
+                            <div className="bg-green-50 p-2 rounded-lg">
+                                <TrendingUp className="h-5 w-5 text-green-600" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-500 truncate">Initial Purse Amount</p>
+                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
+                                ₹
+                                {client.purseAmount?.toLocaleString() || "0"}
+                            </p>
+                        </div>
+                        <div className="ml-4 flex-shrink-0">
+                            <div className="bg-purple-50 p-2 rounded-lg">
+                                <CreditCard className="h-5 w-5 text-purple-600" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-500 truncate">Remaining Purse Amount</p>
+                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
+                                ₹
+                                {client.remainingPurseAmount?.toLocaleString() || "0"}
+                            </p>
+                        </div>
+                        <div className="ml-4 flex-shrink-0">
+                            <div className="bg-orange-50 p-2 rounded-lg">
+                                <Wallet className="h-5 w-5 text-orange-600" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-500 truncate">Total Fees</p>
+                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
+                                ₹
+                                {client.totalBrokerageAmount?.toLocaleString() || "0"}
+                            </p>
+                        </div>
+                        <div className="ml-4 flex-shrink-0">
+                            <div className="bg-red-50 p-2 rounded-lg">
+                                <TrendingUp className="h-5 w-5 text-red-600" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-500 truncate">Total Payments</p>
+                            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-all">
+                                ₹
+                                {client.totalPaymentAmount?.toLocaleString() || "0"}
+                            </p>
+                        </div>
+                        <div className="ml-4 flex-shrink-0">
+                            <div className="bg-indigo-50 p-2 rounded-lg">
+                                <CreditCard className="h-5 w-5 text-indigo-600" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="flex flex-col-reverse lg:flex-row border border-border rounded-2xl w-full justify-between mt-5">
-                {/* Info section */}
-                <div className="flex flex-col w-full lg:w-2/3 gap-5 p-3 md:p-5 lg:p-10">
-                    <div className="flex flex-col md:flex-row gap-5">
-                        <div className="flex flex-col gap-1 min-w-30">
+            {/* Client Details */}
+            <div className="bg-white rounded-lg shadow-sm border mx-5">
+                <div className="p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold text-black mb-4">Client Information</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                        <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2 text-gray-500 text-sm">
                                 <Phone size={16} />
-                                <span>Mobile No</span>
+                                <span>Mobile</span>
                             </div>
-                            <div className="mt-1 font-medium text-base text-black">{client.mobile}</div>
-                        </div>
-                        <div className="hidden md:flex justify-center">
-                            <div className="w-px bg-[#e0e7ff] relative mx-6">
-                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 w-2 h-2 rounded-full bg-[#c7d2fe]"></div>
-                            </div>
+                            <div className="mt-1 font-medium text-base text-black break-all">{client.mobile}</div>
                         </div>
                         <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2 text-gray-500 text-sm">
                                 <Mail size={16} />
-                                <span>Email Address</span>
+                                <span>Email</span>
                             </div>
-                            <div className="mt-1 font-medium text-base text-black">{client.email}</div>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row gap-5">
-                        <div className="flex flex-col gap-1 min-w-30">
-                            <div className="flex items-center gap-2 text-gray-500 text-sm">
-                                <CreditCard size={16} />
-                                <span>PAN No</span>
-                            </div>
-                            <div className="mt-1 font-medium text-base text-black">{client.pan}</div>
-                        </div>
-                        <div className="hidden md:flex justify-center">
-                            <div className="w-px bg-[#e0e7ff] relative mx-6">
-                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 w-2 h-2 rounded-full bg-[#c7d2fe]"></div>
-                            </div>
+                            <div className="mt-1 font-medium text-base text-black break-all">{client.email}</div>
                         </div>
                         <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2 text-gray-500 text-sm">
+                                <CreditCard size={16} />
+                                <span>PAN Number</span>
+                            </div>
+                            <div className="mt-1 font-medium text-base text-black break-all">{client.pan}</div>
+                        </div>
+                        <div className="lg:col-span-2 flex flex-col gap-1">
                             <div className="flex items-center gap-2 text-gray-500 text-sm">
                                 <MapPin size={16} />
                                 <span>Address</span>
@@ -250,33 +266,45 @@ const ClientDetail: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Buttons section */}
-                <div className="flex flex-wrap items-start justify-start md:justify-end w-full lg:w-fit gap-3 py-5 px-5">
-                    <Link href={`/admin/trade?clientId=${client.id}`} className="flex gap-2 items-center hover:bg-secondary rounded-full px-2 py-1 cursor-pointer">
-                        <span className="text-sm">Trade</span>
-                        <div className="bg-primary text-white h-fit p-2 rounded-full">
-                            <ArrowUpRight size={15} />
+                {/* Action Buttons section */}
+                <div className="border-t bg-gray-50 px-4 sm:px-6 py-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                        <div className="grid grid-cols-2 sm:flex gap-3">
+                            <Link
+                                href={`/admin/trade?clientId=${client.id}`}
+                                className="flex gap-2 items-center justify-center hover:bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer transition-colors"
+                            >
+                                <span className="text-sm font-medium">Trade</span>
+                                <div className="bg-primary text-white h-fit p-1.5 rounded-full">
+                                    <ArrowUpRight size={12} />
+                                </div>
+                            </Link>
+                            <Link
+                                href={`/admin/brokerage?clientId=${client.id}`}
+                                className="flex gap-2 items-center justify-center hover:bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer transition-colors"
+                            >
+                                <span className="text-sm font-medium">Fees</span>
+                                <div className="bg-primary text-white h-fit p-1.5 rounded-full">
+                                    <ArrowUpRight size={12} />
+                                </div>
+                            </Link>
+                            <Link
+                                href={`/admin/payment-history?clientId=${client.id}`}
+                                className="flex gap-2 items-center justify-center hover:bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer transition-colors"
+                            >
+                                <span className="text-sm font-medium">Payment</span>
+                                <div className="bg-primary text-white h-fit p-1.5 rounded-full">
+                                    <ArrowUpRight size={12} />
+                                </div>
+                            </Link>
+                            <div className="flex items-center justify-center">
+                                <AddPayment
+                                    name="Add Payment"
+                                    clientId={clientId}
+                                />
+                            </div>
                         </div>
-                    </Link>
-                    <Link href={`/admin/brokerage?clientId=${client.id}`} className="flex gap-2 items-center hover:bg-secondary rounded-full px-2 py-1 cursor-pointer">
-                        <span className="text-sm">Fees</span>
-                        <div className="bg-primary text-white h-fit p-2 rounded-full">
-                            <ArrowUpRight size={15} />
-                        </div>
-                    </Link>
-                    <Link href={`/admin/payment-history?clientId=${client.id}`} className="flex gap-2 items-center hover:bg-secondary rounded-full px-2 py-1 cursor-pointer">
-                        <span className="text-sm">Payment</span>
-                        <div className="bg-primary text-white h-fit p-2 rounded-full">
-                            <ArrowUpRight size={15} />
-                        </div>
-                    </Link>
-                    <div className="flex gap-2 items-center">
-                        <AddPayment
-                            name="Add Payment"
-                            clientId={clientId}
-                        />
                     </div>
-
                 </div>
             </div>
 

@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -12,7 +12,7 @@ import type { ClientFilterRequest } from "@/types/client";
 import type { AddPaymentField, PaymentCreateRequest } from "@/types/payment";
 
 import { getAllClients } from "@/api/client";
-import { createPayment, formatDateForPaymentApi } from "@/api/payment";
+import { createPayment, formatDateForPaymentApi, getPaymentById, updatePayment } from "@/api/payment";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -36,6 +36,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { addPaymentSchema } from "@/types/payment";
 
@@ -44,24 +45,39 @@ import DatePicker from "../ui/datePicker";
 type AddPaymentProps = {
     name?: string;
     clientId?: number;
+    editPaymentId?: number;
+    open?: boolean;
+    onSuccess?: () => void;
+    onOpenChange?: (open: boolean) => void;
 };
 
 const AddPayment: React.FC<AddPaymentProps> = ({
     name = "Add Payment",
     clientId,
+    editPaymentId,
+    open,
+    onSuccess,
+    onOpenChange,
 }) => {
-    const [open, setOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
     const [clients, setClients] = useState<{ id: number; name: string }[]>([]);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
+    const [isLoadingPayment, setIsLoadingPayment] = useState(false);
 
     const queryClient = useQueryClient();
+
+    // Use controlled open state if provided, otherwise use internal state
+    const dialogOpen = open !== undefined ? open : isOpen;
+    const setDialogOpen = onOpenChange || setIsOpen;
+
+    const isEditMode = !!editPaymentId;
 
     const addPaymentForm = useForm<AddPaymentField>({
         resolver: zodResolver(addPaymentSchema),
         defaultValues: {
             client: clientId ? String(clientId) : "",
             date: new Date().toISOString(),
-            amount: 0,
+            amount: undefined,
             description: "",
         },
     });
@@ -90,29 +106,63 @@ const AddPayment: React.FC<AddPaymentProps> = ({
         }
     };
 
-    useEffect(() => {
-        if (open) {
-            fetchClients();
+    const fetchPaymentData = async (paymentId: number) => {
+        setIsLoadingPayment(true);
+        try {
+            const payment = await getPaymentById(paymentId);
+
+            // Update form with payment data
             addPaymentForm.reset({
-                client: clientId ? String(clientId) : "",
-                date: new Date().toISOString(),
-                amount: undefined,
-                description: "",
+                client: String(payment.clientId),
+                date: new Date(payment.paymentDate).toISOString(),
+                amount: payment.amount,
+                description: payment.description || "",
             });
+        } catch (error) {
+            console.error("Failed to load payment data:", error);
+            toast.error("Failed to load payment data");
+        } finally {
+            setIsLoadingPayment(false);
         }
-    }, [open, clientId, addPaymentForm]);
+    };
+
+    useEffect(() => {
+        if (dialogOpen) {
+            fetchClients();
+
+            if (isEditMode && editPaymentId) {
+                fetchPaymentData(editPaymentId);
+            } else {
+                // Reset form for new payment
+                addPaymentForm.reset({
+                    client: clientId ? String(clientId) : "",
+                    date: new Date().toISOString(),
+                    amount: undefined,
+                    description: "",
+                });
+            }
+        }
+    }, [dialogOpen, clientId, editPaymentId, isEditMode, addPaymentForm]);
 
     const createPaymentMutation = useMutation({
-        mutationFn: (paymentData: PaymentCreateRequest) => createPayment(paymentData),
+        mutationFn: (paymentData: PaymentCreateRequest) => {
+            if (isEditMode && editPaymentId) {
+                return updatePayment(editPaymentId, paymentData);
+            } else {
+                return createPayment(paymentData);
+            }
+        },
         onSuccess: () => {
-            toast.success("Payment recorded successfully");
+            toast.success(isEditMode ? "Payment updated successfully" : "Payment recorded successfully");
             addPaymentForm.reset();
-            setOpen(false);
+            setDialogOpen(false);
 
             queryClient.invalidateQueries({ queryKey: ["payments"] });
+            queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
+            queryClient.invalidateQueries({ queryKey: ["client"] });
 
-            if (clientId) {
-                queryClient.invalidateQueries({ queryKey: ["client", clientId] });
+            if (onSuccess) {
+                onSuccess();
             }
         },
         onError: (error: any) => {
@@ -163,8 +213,6 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                 description: data.description || undefined,
             };
 
-            // console.error("Submitting payment data:", paymentData);
-
             await createPaymentMutation.mutateAsync(paymentData);
             toast.dismiss(loadingToast);
         } catch {
@@ -173,22 +221,32 @@ const AddPayment: React.FC<AddPaymentProps> = ({
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button className="ml-auto bg-primary px-5 md:px-8 rounded-xl">
-                    <Plus size={18} />
-                    <span className="hidden md:flex">{name}</span>
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-sm min-w-[150px] p-6">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            {!open && !isEditMode && (
+                <DialogTrigger asChild>
+                    <Button className="ml-auto bg-primary px-5 md:px-8 rounded-xl">
+                        <Plus size={18} />
+                        <span className="hidden md:flex">{name}</span>
+                    </Button>
+                </DialogTrigger>
+            )}
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
 
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-medium">
-                        Add Payment
+                    <DialogTitle className="text-xl font-semibold">
+                        {isEditMode ? "Edit Payment" : name}
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="max-h-[calc(100vh-220px)]">
+                <div className="grid gap-4 py-4">
+                    {
+                    // (isLoadingClients || isLoadingPayment) && (
+                    //     <div className="flex justify-center items-center py-4">
+                    //         <Loader2 className="h-6 w-6 animate-spin" />
+                    //         <span className="ml-2">Loading...</span>
+                    //     </div>
+                    // )
+                    }
                     <Form {...addPaymentForm}>
                         <form className="flex flex-col gap-4 w-full">
 
@@ -198,34 +256,37 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormControl>
-                                            {clientId
+                                            {isLoadingClients
                                                 ? (
-                                                        <div className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                                            {clients.find(c => c.id === clientId)?.name
-                                                                || `Client ID: ${clientId} (loading...)`}
-                                                        </div>
+                                                        <Skeleton className="h-11 w-full" />
                                                     )
-                                                : (
-                                                        <Select
-                                                            disabled={isLoadingClients}
-                                                            value={field.value}
-                                                            onValueChange={field.onChange}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue placeholder="Select Client" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {clients.map(client => (
-                                                                    <SelectItem
-                                                                        key={client.id}
-                                                                        value={String(client.id)}
-                                                                    >
-                                                                        {client.name}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    )}
+                                                : clientId
+                                                    ? (
+                                                            <div className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                                                {clients.find(c => c.id === clientId)?.name
+                                                                    || `Client ID: ${clientId} (loading...)`}
+                                                            </div>
+                                                        )
+                                                    : (
+                                                            <Select
+                                                                value={field.value}
+                                                                onValueChange={field.onChange}
+                                                            >
+                                                                <SelectTrigger className="w-full">
+                                                                    <SelectValue placeholder="Select Client" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {clients.map(client => (
+                                                                        <SelectItem
+                                                                            key={client.id}
+                                                                            value={String(client.id)}
+                                                                        >
+                                                                            {client.name}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        )}
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -238,12 +299,18 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormControl>
-                                            <DatePicker
-                                                placeholder="Date"
-                                                className="w-full bg-secondary hover:bg-secondary h-11"
-                                                selected={field.value ? new Date(field.value) : undefined}
-                                                onSelect={date => field.onChange(date?.toISOString() ?? "")}
-                                            />
+                                            {isLoadingPayment
+                                                ? (
+                                                        <Skeleton className="h-11 w-full" />
+                                                    )
+                                                : (
+                                                        <DatePicker
+                                                            placeholder="Date"
+                                                            className="w-full bg-secondary hover:bg-secondary h-11"
+                                                            selected={field.value ? new Date(field.value) : undefined}
+                                                            onSelect={date => field.onChange(date?.toISOString() ?? "")}
+                                                        />
+                                                    )}
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -256,21 +323,27 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormControl>
-                                            <Input
-                                                type="number"
-                                                placeholder="Amount"
-                                                {...field}
-                                                value={field.value === undefined ? "" : field.value}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    if (value === "") {
-                                                        field.onChange(undefined);
-                                                    } else {
-                                                        const num = Number.parseFloat(value);
-                                                        field.onChange(Number.isNaN(num) ? undefined : num);
-                                                    }
-                                                }}
-                                            />
+                                            {isLoadingPayment
+                                                ? (
+                                                        <Skeleton className="h-11 w-full" />
+                                                    )
+                                                : (
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="Amount"
+                                                            {...field}
+                                                            value={field.value === undefined ? "" : field.value}
+                                                            onChange={(e) => {
+                                                                const value = e.target.value;
+                                                                if (value === "") {
+                                                                    field.onChange(undefined);
+                                                                } else {
+                                                                    const num = Number.parseFloat(value);
+                                                                    field.onChange(Number.isNaN(num) ? undefined : num);
+                                                                }
+                                                            }}
+                                                        />
+                                                    )}
 
                                         </FormControl>
                                         <FormMessage />
@@ -284,11 +357,17 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormControl>
-                                            <Textarea
-                                                placeholder="Description"
-                                                {...field}
-                                                className="border-none ring-0 focus:ring-0 focus:ring-offset-0"
-                                            />
+                                            {isLoadingPayment
+                                                ? (
+                                                        <Skeleton className="h-20 w-full" />
+                                                    )
+                                                : (
+                                                        <Textarea
+                                                            placeholder="Description"
+                                                            {...field}
+                                                            className="border-none ring-0 focus:ring-0 focus:ring-offset-0"
+                                                        />
+                                                    )}
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -300,14 +379,29 @@ const AddPayment: React.FC<AddPaymentProps> = ({
 
                 <DialogFooter className="">
                     <div className="w-full flex items-center justify-end">
-                        <Button
-                            type="button"
-                            className="bg-primary text-sm px-8 rounded-xl"
-                            onClick={addPaymentForm.handleSubmit(onSubmit)}
-                            disabled={addPaymentForm.formState.isSubmitting || createPaymentMutation.isPending}
-                        >
-                            {createPaymentMutation.isPending ? "Saving..." : "Save"}
-                        </Button>
+                        {(isLoadingPayment || isLoadingClients)
+                            ? (
+                                    <Skeleton className="h-10 w-20" />
+                                )
+                            : (
+                                    <Button
+                                        type="button"
+                                        className="bg-primary text-sm px-8 rounded-xl"
+                                        onClick={addPaymentForm.handleSubmit(onSubmit)}
+                                        disabled={addPaymentForm.formState.isSubmitting || createPaymentMutation.isPending}
+                                    >
+                                        {createPaymentMutation.isPending
+                                            ? (
+                                                    <>
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                        {isEditMode ? "Updating..." : "Saving..."}
+                                                    </>
+                                                )
+                                            : (
+                                                    isEditMode ? "Update" : "Save"
+                                                )}
+                                    </Button>
+                                )}
                     </div>
                 </DialogFooter>
             </DialogContent>

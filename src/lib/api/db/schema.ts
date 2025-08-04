@@ -34,6 +34,7 @@ export const clients = sqliteTable("clients", {
     mobile: text("mobile").notNull().unique(),
     address: text("address"),
     purseAmount: real("purse_amount").notNull().default(0),
+    currentHoldings: real("current_holdings").notNull().default(0),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
     updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
 });
@@ -79,14 +80,7 @@ export const trades = sqliteTable("trades", {
     price: real("price").notNull(),
     tradeDate: int("trade_date", { mode: "timestamp" }).notNull(),
     netAmount: real("net_amount").notNull(),
-
-    // FIFO tracking for BUY trades
-    originalQuantity: int("original_quantity").notNull(),
     remainingQuantity: int("remaining_quantity").notNull(),
-    isFullySold: int("is_fully_sold").notNull().default(0),
-
-    // For SELL trades
-    sellProcessed: int("sell_processed").notNull().default(0),
     notes: text("notes"),
 
     // Brokerage calculation tracking
@@ -97,34 +91,20 @@ export const trades = sqliteTable("trades", {
 }, table => [
     index("client_symbol_idx").on(table.clientId, table.symbol, table.exchange),
     index("trade_date_idx").on(table.tradeDate),
-    index("fifo_idx").on(table.type, table.isFullySold, table.tradeDate),
 ]);
 
-// FIFO Allocation table
-export const fifoAllocations = sqliteTable("fifo_allocations", {
+// Simplified FIFO Allocation table
+export const tradeAllocations = sqliteTable("trade_allocations", {
     id: int("id").primaryKey({ autoIncrement: true }),
     sellTradeId: int("sell_trade_id").notNull().references(() => trades.id, { onDelete: "cascade" }),
     buyTradeId: int("buy_trade_id").notNull().references(() => trades.id, { onDelete: "cascade" }),
-    clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
-    symbol: text("symbol").notNull(),
-    exchange: text("exchange", { enum: ["NSE", "BSE"] }).notNull(),
     quantityAllocated: int("quantity_allocated").notNull(),
-    buyPrice: real("buy_price").notNull(),
-    sellPrice: real("sell_price").notNull(),
-    buyDate: int("buy_date", { mode: "timestamp" }).notNull(),
-    sellDate: int("sell_date", { mode: "timestamp" }).notNull(),
-    buyValue: real("buy_value").notNull(),
-    sellValue: real("sell_value").notNull(),
-    profitLoss: real("profit_loss").notNull(),
-    holdingDays: int("holding_days").notNull(),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 }, table => [
-    index("fifo_client_symbol_idx").on(table.clientId, table.symbol, table.exchange),
     index("sell_trade_idx").on(table.sellTradeId),
     index("buy_trade_idx").on(table.buyTradeId),
 ]);
 
-// Unused Amount Tracking (cash from sales not reinvested)
 export const unusedAmounts = sqliteTable("unused_amounts", {
     id: int("id").primaryKey({ autoIncrement: true }),
     clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
@@ -158,7 +138,6 @@ export const dailyBrokerage = sqliteTable("daily_brokerage", {
     date: int("date", { mode: "timestamp" }).notNull(),
     holdingAmount: real("holding_amount").notNull().default(0),
     unusedAmount: real("unused_amount").notNull().default(0),
-    dailyRate: real("daily_rate"), // Kept for backward compatibility
     dailyHoldingRate: real("daily_holding_rate").notNull(),
     dailyUnusedRate: real("daily_unused_rate").notNull(),
     daysInQuarter: int("days_in_quarter"),
@@ -177,14 +156,23 @@ export const payments = sqliteTable("payments", {
     id: int("id").primaryKey({ autoIncrement: true }),
     clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
     amount: real("amount").notNull(),
-    paymentType: text("payment_type", { enum: ["brokerage", "other"] }).notNull().default("other"),
     description: text("description"),
     paymentDate: int("payment_date", { mode: "timestamp" }).notNull(),
-    notes: text("notes"),
     createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 }, table => [
     index("payment_client_date_idx").on(table.clientId, table.paymentDate),
 ]);
+
+// Holdings table
+export const holdings = sqliteTable("holdings", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    clientId: int("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    symbol: text("symbol").notNull(),
+    exchange: text("exchange", { enum: ["NSE", "BSE"] }).notNull(),
+    holding: real("holding").notNull(),
+    createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
+});
 
 // ===== RELATIONS =====
 
@@ -193,6 +181,7 @@ export const clientRelations = relations(clients, ({ many }) => ({
     unusedAmounts: many(unusedAmounts),
     dailyBrokerages: many(dailyBrokerage),
     payments: many(payments),
+    holdings: many(holdings),
 }));
 
 export const stockRelations = relations(stocks, ({ many }) => ({
@@ -202,15 +191,23 @@ export const stockRelations = relations(stocks, ({ many }) => ({
 export const tradeRelations = relations(trades, ({ one, many }) => ({
     client: one(clients, { fields: [trades.clientId], references: [clients.id] }),
     stock: one(stocks, { fields: [trades.symbol, trades.exchange], references: [stocks.symbol, stocks.exchange] }),
-    fifoAllocations: many(fifoAllocations),
-    sourceUnusedAmount: one(unusedAmounts, { fields: [trades.id], references: [unusedAmounts.sourceTradeId] }),
+    fifoAllocationsAsBuy: many(tradeAllocations, { relationName: "buy" }),
+    fifoAllocationsAsSell: many(tradeAllocations, { relationName: "sell" }),
+    unusedAmounts: many(unusedAmounts),
     amountUsages: many(amountUsage),
 }));
 
-export const fifoAllocationRelations = relations(fifoAllocations, ({ one }) => ({
-    sellTrade: one(trades, { fields: [fifoAllocations.sellTradeId], references: [trades.id] }),
-    buyTrade: one(trades, { fields: [fifoAllocations.buyTradeId], references: [trades.id] }),
-    client: one(clients, { fields: [fifoAllocations.clientId], references: [clients.id] }),
+export const tradeAllocationRelations = relations(tradeAllocations, ({ one }) => ({
+    buyTrade: one(trades, {
+        fields: [tradeAllocations.buyTradeId],
+        references: [trades.id],
+        relationName: "buy",
+    }),
+    sellTrade: one(trades, {
+        fields: [tradeAllocations.sellTradeId],
+        references: [trades.id],
+        relationName: "sell",
+    }),
 }));
 
 export const unusedAmountRelations = relations(unusedAmounts, ({ one, many }) => ({
@@ -246,8 +243,8 @@ export type NewStock = typeof stocks.$inferInsert;
 export type Trade = typeof trades.$inferSelect;
 export type NewTrade = typeof trades.$inferInsert;
 
-export type FifoAllocation = typeof fifoAllocations.$inferSelect;
-export type NewFifoAllocation = typeof fifoAllocations.$inferInsert;
+export type TradeAllocation = typeof tradeAllocations.$inferSelect;
+export type NewTradeAllocation = typeof tradeAllocations.$inferInsert;
 
 export type UnusedAmount = typeof unusedAmounts.$inferSelect;
 export type NewUnusedAmount = typeof unusedAmounts.$inferInsert;
@@ -257,9 +254,6 @@ export type NewAmountUsage = typeof amountUsage.$inferInsert;
 
 export type DailyBrokerage = typeof dailyBrokerage.$inferSelect;
 export type NewDailyBrokerage = typeof dailyBrokerage.$inferInsert;
-
-// Type for inserting daily brokerage records (excludes auto-increment id and auto-generated createdAt)
-export type InsertDailyBrokerage = Omit<NewDailyBrokerage, "id" | "createdAt">;
 
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;

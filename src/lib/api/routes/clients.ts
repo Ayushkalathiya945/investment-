@@ -2,6 +2,8 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 
+import type { Client } from "../db/schema";
+
 import * as brokerageQueries from "../db/queries/brokerage";
 import * as clientQueries from "../db/queries/client";
 import * as paymentQueries from "../db/queries/payment";
@@ -9,14 +11,11 @@ import * as tradeQueries from "../db/queries/trade";
 import { authMiddleware } from "../middleware/auth";
 import { clientFilterSchema, clientGetOneSchema, clientSchema, updateClientSchema } from "../utils/validation-schemas";
 
-// Create a new Hono router for client routes
 const clientRouter = new Hono();
 
-// Add a global error handler to properly format error responses
 clientRouter.onError((err, c) => {
     console.error("Client route error:", err);
 
-    // Format HTTP exceptions
     if (err instanceof HTTPException) {
         const status = err.status || 500;
         const message = err.message || "An error occurred";
@@ -28,7 +27,6 @@ clientRouter.onError((err, c) => {
         }, status);
     }
 
-    // Format other errors
     return c.json({
         success: false,
         message: err.message || "Internal Server Error",
@@ -36,17 +34,12 @@ clientRouter.onError((err, c) => {
     }, 500);
 });
 
-// Apply authentication middleware to all client routes
 clientRouter.use("*", authMiddleware);
 
-// Create new client
 clientRouter.post("/create", zValidator("json", clientSchema), async (c) => {
     const clientData = c.req.valid("json");
 
-    // //console.log("Creating client with data:", clientData);
-
     try {
-        // Check email, mobile, and PAN separately for more specific error messages
         if (clientData.email) {
             const existingEmail = await clientQueries.findOne_Or({ email: clientData.email });
             if (existingEmail) {
@@ -68,9 +61,6 @@ clientRouter.post("/create", zValidator("json", clientSchema), async (c) => {
             }
         }
 
-        // //console.log("No duplicate records found, proceeding with client creation");
-
-        // Insert client into database
         const client = await clientQueries.create({
             ...clientData,
             pan: clientData.pan.toUpperCase(),
@@ -83,17 +73,12 @@ clientRouter.post("/create", zValidator("json", clientSchema), async (c) => {
             data: client,
         }, 201);
     } catch (error: any) {
-        // Log the detailed error for debugging
         console.error("Error creating client:", error);
-        // console.error("Error stack:", error.stack);
 
-        // If it's already an HTTP exception (like our 409 conflicts), pass it through
         if (error instanceof HTTPException) {
-            // The onError handler will format this properly
             throw error;
         }
 
-        // Handle unique constraint violations from database (as a backup if our checks miss something)
         if (error.message?.includes("UNIQUE constraint failed")) {
             if (error.message.includes("email")) {
                 return c.json({
@@ -114,7 +99,7 @@ clientRouter.post("/create", zValidator("json", clientSchema), async (c) => {
                     status: 409,
                 }, 409);
             }
-            // Generic unique constraint violation
+
             return c.json({
                 success: false,
                 message: "A record with this information already exists",
@@ -122,7 +107,6 @@ clientRouter.post("/create", zValidator("json", clientSchema), async (c) => {
             }, 409);
         }
 
-        // For other database or server errors
         console.error("Database or server error:", error);
         return c.json({
             success: false,
@@ -132,12 +116,10 @@ clientRouter.post("/create", zValidator("json", clientSchema), async (c) => {
     }
 });
 
-// Get all clients with pagination and search
 clientRouter.post("/get-all", zValidator("json", clientFilterSchema), async (c) => {
     const { page, limit, search, from, to } = c.req.valid("json");
 
     try {
-        // Parse dates if provided
         let fromDate: Date | undefined;
         let toDate: Date | undefined;
 
@@ -176,35 +158,32 @@ clientRouter.post("/get-all", zValidator("json", clientFilterSchema), async (c) 
     }
 });
 
-// Get client by ID
 clientRouter.get("/get-one/:id", zValidator("param", clientGetOneSchema), async (c) => {
     const id = c.req.valid("param").id;
 
     try {
-        const client = await clientQueries.findOne_And({ id });
+        const client: Client = await clientQueries.findOne_And({ id });
         if (!client) {
             throw new HTTPException(404, { message: "Client not found" });
         }
 
-        // Calculate the total trade amount of particular client
-        const totalTradeAmount = await tradeQueries.calculateTotalTradeAmount({ clientId: id });
+        const totalNetAmount = client.currentHoldings;
 
-        // Calculate the total brokerage amount of particular client
         const totalBrokerageAmount = await brokerageQueries.calculateTotalbrokerageAmount({ clientId: id });
 
-        // Calculate the total payment amount of particular client
         const totalPaymentAmount = await paymentQueries.calculateTotalPaymentAmount({ clientId: id });
 
-        // Calculate the total sold stock amount for this client
         const totalSoldAmount = await tradeQueries.calculateTotalSoldAmount({ clientId: id });
 
-        // Calculate remaining purse amount (initial purse - buy trades + sell trades)
-        const remainingPurseAmount = client.purseAmount - totalTradeAmount + totalSoldAmount;
+        const totalTradeAmount = await tradeQueries.currentHoldingAmount(id);
+
+        const remainingPurseAmount = client.purseAmount + totalNetAmount;
 
         return c.json({
             success: true,
             data: {
                 ...client,
+                totalNetAmount,
                 totalTradeAmount,
                 totalBrokerageAmount,
                 totalPaymentAmount,
@@ -219,12 +198,10 @@ clientRouter.get("/get-one/:id", zValidator("param", clientGetOneSchema), async 
     }
 });
 
-// Update client
 clientRouter.put("/update", zValidator("json", updateClientSchema), async (c) => {
     const updateData = c.req.valid("json");
 
     try {
-        // Check if client exists
         const existingClient = await clientQueries.findOne_And({ id: updateData.id });
         if (!existingClient) {
             throw new HTTPException(404, { message: "Client not found" });
@@ -280,13 +257,11 @@ clientRouter.delete("/:id", zValidator("param", clientGetOneSchema), async (c) =
     const id = c.req.valid("param").id;
 
     try {
-        // Check if client exists
         const existingClient = await clientQueries.findOne_And({ id });
         if (!existingClient) {
             throw new HTTPException(404, { message: "Client not found" });
         }
 
-        // Delete client
         await clientQueries.remove(id);
 
         return c.json({
@@ -306,7 +281,6 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
     const body = c.req.valid("json");
 
     try {
-        // Convert date strings to timestamps if provided
         let fromDate: Date | undefined;
         let toDate: Date | undefined;
 
@@ -316,23 +290,18 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
 
         if (body.to) {
             toDate = new Date(body.to);
-            // Set to end of day for the "to" date
             toDate.setHours(23, 59, 59, 999);
         }
 
-        // Get all financial totals from our comprehensive self-contained function
         const financialTotals = await clientQueries.calculateFinancialTotalsByDateRange({
             from: fromDate,
             to: toDate,
         });
 
-        // Calculate remaining purse amount (considering only trades, not payments or brokerage)
-        // When a date range is selected, we're calculating the purse amount as of the end date
-        const totalBuyValue = financialTotals.totalBuyTrades || 0; // Total cost of ALL buy trades up to end date
-        const totalSellValue = financialTotals.totalSellTrades || 0; // Total revenue from ALL sell trades up to end date
-        const totalInitialPurse = financialTotals.totalPurseAmount || 0; // Total initial purse amount
+        const totalBuyValue = financialTotals.totalBuyTrades || 0;
+        const totalSellValue = financialTotals.totalSellTrades || 0;
+        const totalInitialPurse = financialTotals.totalPurseAmount || 0;
 
-        // Formula: Initial Purse - All Buy Trades + All Sell Trades (up to end date)
         const remainingPurseAmount = totalInitialPurse - totalBuyValue + totalSellValue;
 
         const response = {
@@ -358,7 +327,6 @@ clientRouter.post("/analytics", zValidator("json", clientFilterSchema), async (c
     }
 });
 
-// Get all clients ID and name for dropdowns
 clientRouter.get("/all-id-name", async (c) => {
     try {
         const clients = await clientQueries.getAllClientsIdAndName();

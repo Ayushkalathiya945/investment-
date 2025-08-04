@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+import DatePicker from "../ui/datePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type AddTradeProps = {
@@ -93,7 +94,6 @@ const AddTrade: React.FC<AddTradeProps> = ({
 }) => {
     const [internalOpen, setInternalOpen] = useState(false);
 
-    // Use either controlled or internal state
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     const setOpen = setControlledOpen || setInternalOpen;
     const [searchTerm, setSearchTerm] = useState("");
@@ -173,12 +173,8 @@ const AddTrade: React.FC<AddTradeProps> = ({
 
     useEffect(() => {
         if (isEditMode && tradeDetails) {
-            // console.log("Populating form with trade details:", tradeDetails);
-
             try {
                 const tradeData = tradeDetails.trade ? tradeDetails.trade : tradeDetails;
-
-                // console.log("Working with trade data:", tradeData);
 
                 const exchange = (tradeData.exchange === "BSE")
                     ? "BSE" as const
@@ -189,33 +185,19 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     if (typeof tradeData.tradeDate === "number") {
                         const dateObj = new Date(tradeData.tradeDate);
                         formattedTradeDate = dateObj.toISOString().split("T")[0];
-                        // console.log(`Converted timestamp ${tradeData.tradeDate} to date: ${formattedTradeDate}`);
                     } else if (typeof tradeData.tradeDate === "string") {
                         if (tradeData.tradeDate.includes("T")) {
                             formattedTradeDate = tradeData.tradeDate.split("T")[0];
                         } else {
                             formattedTradeDate = tradeData.tradeDate;
                         }
-                        // console.log(`Using string date: ${formattedTradeDate}`);
                     } else if (tradeData.tradeDate instanceof Date) {
                         formattedTradeDate = tradeData.tradeDate.toISOString().split("T")[0];
-                        // console.log(`Converted Date object to: ${formattedTradeDate}`);
                     }
                 } else {
                     console.warn("Trade date is missing, using current date");
                     formattedTradeDate = new Date().toISOString().split("T")[0];
                 }
-
-                // console.log("Setting form values with:", {
-                //     clientId: tradeData.clientId,
-                //     symbol: tradeData.symbol,
-                //     exchange,
-                //     tradeType: tradeData.type,
-                //     quantity: tradeData.quantity,
-                //     price: tradeData.price,
-                //     date: formattedTradeDate,
-                //     notes: tradeData.notes || "",
-                // });
 
                 tradeForm.reset({
                     clientId: tradeData.clientId,
@@ -292,6 +274,10 @@ const AddTrade: React.FC<AddTradeProps> = ({
             toast.success(response.message || "Trade created successfully");
             queryClient.invalidateQueries({ queryKey: ["trades"] });
             queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
+            queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
+            queryClient.invalidateQueries({ queryKey: ["client"] });
+            queryClient.invalidateQueries({ queryKey: ["trade"] });
+
             tradeForm.reset();
             setOpen(false);
             if (onSuccess)
@@ -372,7 +358,12 @@ const AddTrade: React.FC<AddTradeProps> = ({
                 toast.success(response.message || "Trade updated successfully");
                 queryClient.invalidateQueries({ queryKey: ["trades"] });
                 queryClient.invalidateQueries({ queryKey: ["tradeSummary"] });
+                queryClient.invalidateQueries({ queryKey: ["clientAnalytics"] });
+                queryClient.invalidateQueries({ queryKey: ["client"] });
+                queryClient.invalidateQueries({ queryKey: ["trade"] });
+
                 tradeForm.reset();
+
                 setOpen(false);
                 if (onSuccess)
                     onSuccess();
@@ -968,7 +959,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                             </div>
 
                                             <div className="flex flex-col md:flex-row w-full gap-4 items-center">
-                                                {/* <div className="w-full px-1">
+                                                <div className="w-full px-1">
                                                     <FormField
                                                         control={tradeForm.control}
                                                         name="tradeDate"
@@ -993,7 +984,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                                                             </FormItem>
                                                         )}
                                                     />
-                                                </div> */}
+                                                </div>
 
                                                 <div className="w-full">
                                                     <FormField

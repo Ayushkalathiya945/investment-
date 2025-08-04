@@ -13,7 +13,13 @@ export async function create(data: NewPayment, tx?: TransactionType) {
 }
 
 export async function update(data: Partial<NewPayment> & { id: number }, tx?: TransactionType) {
-    const [payment] = await getDB(tx).update(payments).set(data).where(eq(payments.id, data.id)).returning();
+    const { id, ...updateFields } = data;
+
+    const [payment] = await getDB(tx)
+        .update(payments)
+        .set(updateFields)
+        .where(eq(payments.id, id))
+        .returning();
 
     return payment ?? null;
 }

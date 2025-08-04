@@ -6,12 +6,6 @@ import type { NewUnusedAmount } from "../schema";
 import { db, getDB } from "..";
 import { unusedAmounts } from "../schema";
 
-/**
- * Calculates the total unused amount for a given client.
- * This is the sum of all remaining amounts from sales that have not yet been fully reinvested.
- * @param clientId The ID of the client.
- * @returns The total unused amount, or 0 if none.
- */
 export async function getTotalUnusedAmount(clientId: number): Promise<number> {
     const result = await db
         .select({

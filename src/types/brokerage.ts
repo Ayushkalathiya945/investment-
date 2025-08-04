@@ -1,22 +1,21 @@
 import type { ExchangeType } from "./stocks";
 
-// Define period types for brokerage calculation
 export enum PeriodType {
     DAILY = "daily",
     MONTHLY = "monthly",
     QUARTERLY = "quarterly",
 }
 
-// Daily brokerage type - matches the API response
 export type DailyBrokerage = {
     id: number;
     clientId: number;
     clientName: string;
-    date: string; // ISO date string from API
+    date: string;
     totalDailyBrokerage: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
 };
 
-// Quarterly brokerage type
 export type QuarterlyBrokerage = {
     id: number;
     clientId: number;
@@ -30,11 +29,12 @@ export type QuarterlyBrokerage = {
     daysInQuarter: number;
     isPaid: number;
     paidAmount: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
     paidDate?: Date;
     createdAt: Date;
 };
 
-// Sell trade brokerage type
 export type SellTradeBrokerage = {
     id: number;
     tradeId: number;
@@ -42,11 +42,12 @@ export type SellTradeBrokerage = {
     amount: number;
     brokerageRate: number;
     brokerageAmount: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
     appliedAt: Date;
     createdAt: Date;
 };
 
-// Brokerage detail type
 export type BrokerageDetail = {
     id: number;
     brokerageId: number;
@@ -61,7 +62,6 @@ export type BrokerageDetail = {
     createdAt: Date;
 };
 
-// For calculating brokerage
 export type BrokerageCalculationDetail = {
     id?: number;
     brokerageId?: number;
@@ -84,7 +84,6 @@ export type BrokerageCalculationDetail = {
     brokerageAmount?: number;
 };
 
-// Legacy response type for backwards compatibility
 export type BrokerageResponseType = {
     success: boolean;
     data: {
@@ -100,7 +99,6 @@ export type BrokerageResponseType = {
     };
 };
 
-// Response types for brokerage calculation
 export type BrokerageDetailType = {
     tradeId: number;
     symbol: string;
@@ -135,29 +133,27 @@ export type BrokerageCalculateResponse = {
     };
 };
 
-// Filter type for retrieving brokerage records
 export type BrokerageFilterRequest = {
     page?: number;
     limit?: number;
     periodType?: PeriodType;
     clientId?: string;
-    // Daily filters
+
     startDate?: string | Date;
     endDate?: string | Date;
-    // Monthly filters
+
     startMonth?: number;
     startYear?: number;
     endMonth?: number;
     endYear?: number;
-    // Quarterly filters
+
     quarter?: number;
     quarterYear?: number;
-    // Generic date range filters
+
     from?: string | Date;
     to?: string | Date;
 };
 
-// Base response type for paginated brokerage data
 export type PaginatedBrokerageResponse<T> = {
     success: boolean;
     data: T[];
@@ -172,16 +168,16 @@ export type PaginatedBrokerageResponse<T> = {
     message?: string;
 };
 
-// Daily brokerage record
 export type DailyBrokerageRecord = {
     id: number;
     clientId: number;
     clientName: string;
     date: Date;
     totalDailyBrokerage: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
 };
 
-// Monthly brokerage summary
 export type MonthlyBrokerageSummary = {
     clientId: number;
     clientName: string;
@@ -190,9 +186,10 @@ export type MonthlyBrokerageSummary = {
         year: number;
     };
     brokerageAmount: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
 };
 
-// Quarterly brokerage summary
 export type QuarterlyBrokerageSummary = {
     clientId: number;
     clientName: string;
@@ -201,20 +198,19 @@ export type QuarterlyBrokerageSummary = {
         year: number;
     };
     brokerageAmount: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
 };
 
-// Response types for each period type
 export type DailyBrokerageResponse = PaginatedBrokerageResponse<DailyBrokerageRecord>;
 export type MonthlyBrokerageResponse = PaginatedBrokerageResponse<MonthlyBrokerageSummary>;
 export type QuarterlyBrokerageResponse = PaginatedBrokerageResponse<QuarterlyBrokerageSummary>;
 
-// Union type for all brokerage responses
 export type BrokerageResponse
     = | DailyBrokerageResponse
         | MonthlyBrokerageResponse
         | QuarterlyBrokerageResponse;
 
-// Response type for brokerage list
 export type BrokerageRecord = {
     id: number;
     clientId: number;

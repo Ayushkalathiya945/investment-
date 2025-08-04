@@ -1,7 +1,7 @@
 {
     "version": "6",
     "dialect": "sqlite",
-    "id": "a09b27c3-4d80-4546-bca8-e2a0d26f007b",
+    "id": "0e0e2aa1-5fac-4fb1-aff0-43a3667a0baf",
     "prevId": "00000000-0000-0000-0000-000000000000",
     "tables": {
         "admins": {
@@ -196,6 +196,14 @@
                     "autoincrement": false,
                     "default": 0
                 },
+                "current_holdings": {
+                    "name": "current_holdings",
+                    "type": "real",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false,
+                    "default": 0
+                },
                 "created_at": {
                     "name": "created_at",
                     "type": "integer",
@@ -278,13 +286,6 @@
                     "notNull": true,
                     "autoincrement": false,
                     "default": 0
-                },
-                "daily_rate": {
-                    "name": "daily_rate",
-                    "type": "real",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
                 },
                 "daily_holding_rate": {
                     "name": "daily_holding_rate",
@@ -380,8 +381,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "fifo_allocations": {
-            "name": "fifo_allocations",
+        "holdings": {
+            "name": "holdings",
             "columns": {
                 "id": {
                     "name": "id",
@@ -389,20 +390,6 @@
                     "primaryKey": true,
                     "notNull": true,
                     "autoincrement": true
-                },
-                "sell_trade_id": {
-                    "name": "sell_trade_id",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "buy_trade_id": {
-                    "name": "buy_trade_id",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
                 },
                 "client_id": {
                     "name": "client_id",
@@ -425,65 +412,9 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "quantity_allocated": {
-                    "name": "quantity_allocated",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "buy_price": {
-                    "name": "buy_price",
+                "holding": {
+                    "name": "holding",
                     "type": "real",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "sell_price": {
-                    "name": "sell_price",
-                    "type": "real",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "buy_date": {
-                    "name": "buy_date",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "sell_date": {
-                    "name": "sell_date",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "buy_value": {
-                    "name": "buy_value",
-                    "type": "real",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "sell_value": {
-                    "name": "sell_value",
-                    "type": "real",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "profit_loss": {
-                    "name": "profit_loss",
-                    "type": "real",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
-                "holding_days": {
-                    "name": "holding_days",
-                    "type": "integer",
                     "primaryKey": false,
                     "notNull": true,
                     "autoincrement": false
@@ -494,63 +425,20 @@
                     "primaryKey": false,
                     "notNull": true,
                     "autoincrement": false
+                },
+                "updated_at": {
+                    "name": "updated_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
                 }
             },
-            "indexes": {
-                "fifo_client_symbol_idx": {
-                    "name": "fifo_client_symbol_idx",
-                    "columns": [
-                        "client_id",
-                        "symbol",
-                        "exchange"
-                    ],
-                    "isUnique": false
-                },
-                "sell_trade_idx": {
-                    "name": "sell_trade_idx",
-                    "columns": [
-                        "sell_trade_id"
-                    ],
-                    "isUnique": false
-                },
-                "buy_trade_idx": {
-                    "name": "buy_trade_idx",
-                    "columns": [
-                        "buy_trade_id"
-                    ],
-                    "isUnique": false
-                }
-            },
+            "indexes": {},
             "foreignKeys": {
-                "fifo_allocations_sell_trade_id_trades_id_fk": {
-                    "name": "fifo_allocations_sell_trade_id_trades_id_fk",
-                    "tableFrom": "fifo_allocations",
-                    "tableTo": "trades",
-                    "columnsFrom": [
-                        "sell_trade_id"
-                    ],
-                    "columnsTo": [
-                        "id"
-                    ],
-                    "onDelete": "cascade",
-                    "onUpdate": "no action"
-                },
-                "fifo_allocations_buy_trade_id_trades_id_fk": {
-                    "name": "fifo_allocations_buy_trade_id_trades_id_fk",
-                    "tableFrom": "fifo_allocations",
-                    "tableTo": "trades",
-                    "columnsFrom": [
-                        "buy_trade_id"
-                    ],
-                    "columnsTo": [
-                        "id"
-                    ],
-                    "onDelete": "cascade",
-                    "onUpdate": "no action"
-                },
-                "fifo_allocations_client_id_clients_id_fk": {
-                    "name": "fifo_allocations_client_id_clients_id_fk",
-                    "tableFrom": "fifo_allocations",
+                "holdings_client_id_clients_id_fk": {
+                    "name": "holdings_client_id_clients_id_fk",
+                    "tableFrom": "holdings",
                     "tableTo": "clients",
                     "columnsFrom": [
                         "client_id"
@@ -590,14 +478,6 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "payment_type": {
-                    "name": "payment_type",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false,
-                    "default": "'other'"
-                },
                 "description": {
                     "name": "description",
                     "type": "text",
@@ -610,13 +490,6 @@
                     "type": "integer",
                     "primaryKey": false,
                     "notNull": true,
-                    "autoincrement": false
-                },
-                "notes": {
-                    "name": "notes",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
                     "autoincrement": false
                 },
                 "created_at": {
@@ -793,6 +666,93 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
+        "trade_allocations": {
+            "name": "trade_allocations",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": true
+                },
+                "sell_trade_id": {
+                    "name": "sell_trade_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "buy_trade_id": {
+                    "name": "buy_trade_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "quantity_allocated": {
+                    "name": "quantity_allocated",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                }
+            },
+            "indexes": {
+                "sell_trade_idx": {
+                    "name": "sell_trade_idx",
+                    "columns": [
+                        "sell_trade_id"
+                    ],
+                    "isUnique": false
+                },
+                "buy_trade_idx": {
+                    "name": "buy_trade_idx",
+                    "columns": [
+                        "buy_trade_id"
+                    ],
+                    "isUnique": false
+                }
+            },
+            "foreignKeys": {
+                "trade_allocations_sell_trade_id_trades_id_fk": {
+                    "name": "trade_allocations_sell_trade_id_trades_id_fk",
+                    "tableFrom": "trade_allocations",
+                    "tableTo": "trades",
+                    "columnsFrom": [
+                        "sell_trade_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "cascade",
+                    "onUpdate": "no action"
+                },
+                "trade_allocations_buy_trade_id_trades_id_fk": {
+                    "name": "trade_allocations_buy_trade_id_trades_id_fk",
+                    "tableFrom": "trade_allocations",
+                    "tableTo": "trades",
+                    "columnsFrom": [
+                        "buy_trade_id"
+                    ],
+                    "columnsTo": [
+                        "id"
+                    ],
+                    "onDelete": "cascade",
+                    "onUpdate": "no action"
+                }
+            },
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "checkConstraints": {}
+        },
         "trades": {
             "name": "trades",
             "columns": {
@@ -859,35 +819,12 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "original_quantity": {
-                    "name": "original_quantity",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
                 "remaining_quantity": {
                     "name": "remaining_quantity",
                     "type": "integer",
                     "primaryKey": false,
                     "notNull": true,
                     "autoincrement": false
-                },
-                "is_fully_sold": {
-                    "name": "is_fully_sold",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false,
-                    "default": 0
-                },
-                "sell_processed": {
-                    "name": "sell_processed",
-                    "type": "integer",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false,
-                    "default": 0
                 },
                 "notes": {
                     "name": "notes",
@@ -931,15 +868,6 @@
                 "trade_date_idx": {
                     "name": "trade_date_idx",
                     "columns": [
-                        "trade_date"
-                    ],
-                    "isUnique": false
-                },
-                "fifo_idx": {
-                    "name": "fifo_idx",
-                    "columns": [
-                        "type",
-                        "is_fully_sold",
                         "trade_date"
                     ],
                     "isUnique": false

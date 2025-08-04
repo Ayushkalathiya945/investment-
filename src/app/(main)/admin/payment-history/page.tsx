@@ -2,7 +2,7 @@
 import type { DateRange } from "react-day-picker";
 
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Pencil } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -13,6 +13,7 @@ import type { PaymentFilterRequest } from "@/types/payment";
 import { getAllClients } from "@/api/client";
 import { formatDateForPaymentApi, getAllPayments } from "@/api/payment";
 import AddPayment from "@/components/Dialoge/AddPayment";
+import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import RangeDatePicker from "@/components/ui/rangeDatePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,26 +24,22 @@ const PaymentHistory: React.FC = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Extract query parameters
     const initialPage = searchParams.get("page") ? Number.parseInt(searchParams.get("page") as string, 10) : 1;
     const initialClientId = searchParams.get("clientId") ? Number.parseInt(searchParams.get("clientId") as string, 10) : undefined;
     const initialFrom = searchParams.get("from") || undefined;
     const initialTo = searchParams.get("to") || undefined;
 
-    // State for filters and pagination
     const [currentPage, setCurrentPage] = useState(initialPage);
     const [selectedClientId, setSelectedClientId] = useState<number | undefined>(initialClientId);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
         if (initialFrom && initialTo) {
             try {
-                // Ensure proper date parsing - format is expected to be YYYY-MM-DD
                 const from = new Date(initialFrom);
                 from.setHours(0, 0, 0, 0);
 
                 const to = new Date(initialTo);
                 to.setHours(23, 59, 59, 999);
 
-                // Only set date range if dates are valid
                 if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
                     return { from, to };
                 }
@@ -53,11 +50,9 @@ const PaymentHistory: React.FC = () => {
         return undefined;
     });
 
-    // State for clients dropdown
     const [clients, setClients] = useState<{ id: number; name: string }[]>([]);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
 
-    // Update URL with current filters
     const updateUrlParams = useCallback(() => {
         const params = new URLSearchParams();
 
@@ -69,14 +64,11 @@ const PaymentHistory: React.FC = () => {
             params.set("clientId", selectedClientId.toString());
         }
 
-        // Add date parameters only if both dates are set and valid
         if (dateRange?.from && dateRange?.to) {
             try {
-                // Create formatted dates for URL parameters
                 const formattedFrom = formatDateForPaymentApi(dateRange.from);
                 const formattedTo = formatDateForPaymentApi(dateRange.to);
 
-                // Only add params if both dates are valid
                 if (formattedFrom && formattedTo) {
                     params.set("from", formattedFrom);
                     params.set("to", formattedTo);
@@ -92,7 +84,6 @@ const PaymentHistory: React.FC = () => {
                 console.error("Error setting date params:", e);
             }
         } else {
-            // Remove date params if not filtered by date
             params.delete("from");
             params.delete("to");
         }
@@ -101,17 +92,14 @@ const PaymentHistory: React.FC = () => {
         router.push(newUrl, { scroll: false });
     }, [currentPage, selectedClientId, dateRange, router]);
 
-    // Update URL when filters change - use a ref to track first render to avoid initial update
     const isFirstRender = React.useRef(true);
 
     useEffect(() => {
-        // Skip the first render to avoid infinite loops with URL params
         if (isFirstRender.current) {
             isFirstRender.current = false;
             return;
         }
 
-        // Debounce URL updates to prevent rapid changes
         const timeoutId = setTimeout(() => {
             updateUrlParams();
         }, 100);
@@ -164,6 +152,7 @@ const PaymentHistory: React.FC = () => {
         isLoading,
         isFetching,
         error,
+        refetch,
     } = useQuery({
         queryKey: ["payments", filterParams],
         queryFn: () => getAllPayments(filterParams),
@@ -207,7 +196,6 @@ const PaymentHistory: React.FC = () => {
 
                 setDateRange({ from: startDate, to: endDate });
             } else {
-                // console.error("Clearing date range");
                 setDateRange(undefined);
             }
 
@@ -216,6 +204,22 @@ const PaymentHistory: React.FC = () => {
             setTimeout(() => {
                 isHandlingDateChange.current = false;
             }, 100);
+        }
+    };
+
+    const [editPaymentId, setEditPaymentId] = useState<number | undefined>();
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const handleEditPayment = (tradeId: number) => {
+        setEditPaymentId(tradeId);
+        setShowEditDialog(true);
+    };
+
+    const handleDialogOpenChange = (open: boolean) => {
+        setShowEditDialog(open);
+        if (!open) {
+            setTimeout(() => {
+                setEditPaymentId(undefined);
+            }, 300);
         }
     };
 
@@ -241,123 +245,154 @@ const PaymentHistory: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col w-full min-h-[94vh] gap-5">
-            <div className="flex-col md:flex md:flex-row justify-between w-full items-center">
-                <h1 className="text-3xl font-semibold">Payment History</h1>
-                <div className="flex-col md:flex md:flex-row gap-4 items-center">
-                    <div className="flex min-w-50 ">
-                        <Select
-                            value={selectedClientId ? String(selectedClientId) : "all"}
-                            onValueChange={handleClientChange}
-                            disabled={isLoadingClients}
-                        >
-                            <SelectTrigger className="w-full ring-0">
-                                <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "All Clients"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Clients</SelectItem>
-                                {clients.map(client => (
-                                    <SelectItem
-                                        className="cursor-pointer"
-                                        key={client.id}
-                                        value={String(client.id)}
-                                    >
-                                        {client.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="md:w-1/2 w-full my-3 md:my-0">
-                        <RangeDatePicker
-                            from={dateRange?.from ? dateRange.from.toISOString() : undefined}
-                            to={dateRange?.to ? dateRange.to.toISOString() : undefined}
-                            onChange={handleDateChange}
+        <>
+            <div className="flex flex-col w-full min-h-[94vh] gap-5">
+                <div className="flex-col md:flex md:flex-row justify-between w-full items-center">
+                    <h1 className="text-3xl font-semibold">Payment History</h1>
+                    <div className="flex-col md:flex md:flex-row gap-4 items-center">
+                        <div className="flex min-w-50 ">
+                            <Select
+                                value={selectedClientId ? String(selectedClientId) : "all"}
+                                onValueChange={handleClientChange}
+                                disabled={isLoadingClients}
+                            >
+                                <SelectTrigger className="w-full ring-0">
+                                    <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "All Clients"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Clients</SelectItem>
+                                    {clients.map(client => (
+                                        <SelectItem
+                                            className="cursor-pointer"
+                                            key={client.id}
+                                            value={String(client.id)}
+                                        >
+                                            {client.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="md:w-1/2 w-full my-3 md:my-0">
+                            <RangeDatePicker
+                                from={dateRange?.from ? dateRange.from.toISOString() : undefined}
+                                to={dateRange?.to ? dateRange.to.toISOString() : undefined}
+                                onChange={handleDateChange}
+                            />
+                        </div>
+                        <AddPayment
+                            name="Add Payment"
+                            clientId={selectedClientId}
                         />
                     </div>
-                    <AddPayment
-                        name="Add Payment"
-                        clientId={selectedClientId}
-                    />
                 </div>
-            </div>
 
-            <div className="h-full flex flex-col flex-grow gap-10 justify-between">
-                <div className="w-full h-full flex flex-col justify-between border rounded-xl border-[#EFF6FF]">
-                    <Table className="bg-white">
-                        <TableHeader>
-                            <TableRow className="bg-[#F9F9F9] text-[16px] font-semibold w-full justify-between items-center gap-4 rounded-lg py-3">
-                                <TableHead className="rounded-tl-xl">No.</TableHead>
-                                <TableHead>Client</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="rounded-tr-xl">Date</TableHead>
-                            </TableRow>
-                        </TableHeader>
+                <div className="h-full flex flex-col flex-grow gap-10 justify-between">
+                    <div className="w-full h-full flex flex-col justify-between border rounded-xl border-[#EFF6FF]">
+                        <Table className="bg-white">
+                            <TableHeader>
+                                <TableRow className="bg-[#F9F9F9] text-[16px] font-semibold w-full justify-between items-center gap-4 rounded-lg py-3">
+                                    <TableHead className="rounded-tl-xl">No.</TableHead>
+                                    <TableHead>Client</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead className="rounded-tr-xl">Date</TableHead>
+                                    <TableHead className="rounded-tr-xl">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
 
-                        <TableBody>
-                            {isLoading || isFetching
-                                ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8">
-                                                <div className="flex justify-center items-center">
-                                                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                                                    <span>Loading payments...</span>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                : error
+                            <TableBody>
+                                {isLoading || isFetching
                                     ? (
                                             <TableRow>
                                                 <TableCell colSpan={5} className="text-center py-8">
-                                                    <div className="flex justify-center items-center text-red-500">
-                                                        <AlertCircle className="h-5 w-5 mr-2" />
-                                                        <span>Error loading payments. Please try again.</span>
+                                                    <div className="flex justify-center items-center">
+                                                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                                                        <span>Loading payments...</span>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
                                         )
-                                    : payments.length === 0
+                                    : error
                                         ? (
                                                 <TableRow>
                                                     <TableCell colSpan={5} className="text-center py-8">
-                                                        No payments found
+                                                        <div className="flex justify-center items-center text-red-500">
+                                                            <AlertCircle className="h-5 w-5 mr-2" />
+                                                            <span>Error loading payments. Please try again.</span>
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             )
-                                        : (
-                                                payments.map((payment, index) => {
-                                                    const client = clients.find(c => c.id === payment.clientId)?.name || `Client ${payment.clientId}`;
+                                        : payments.length === 0
+                                            ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={5} className="text-center py-8">
+                                                            No payments found
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )
+                                            : (
+                                                    payments.map((payment, index) => {
+                                                        const client = clients.find(c => c.id === payment.clientId)?.name || `Client ${payment.clientId}`;
 
-                                                    return (
-                                                        <TableRow key={payment.id} className="w-full py-10 gap-4 mx-3">
-                                                            <TableCell>{(currentPage - 1) * PAGE_LIMIT + index + 1}</TableCell>
-                                                            <TableCell>{client}</TableCell>
-                                                            <TableCell>
-                                                                ₹
-                                                                {payment.amount.toLocaleString("en-IN")}
-                                                            </TableCell>
-                                                            <TableCell>{payment.description || "-"}</TableCell>
-                                                            <TableCell>{formatDate(payment.paymentDate)}</TableCell>
-                                                        </TableRow>
-                                                    );
-                                                })
-                                            )}
-                        </TableBody>
-                    </Table>
+                                                        return (
+                                                            <TableRow key={payment.id} className="w-full py-10 gap-4 mx-3">
+                                                                <TableCell>{(currentPage - 1) * PAGE_LIMIT + index + 1}</TableCell>
+                                                                <TableCell>{client}</TableCell>
+                                                                <TableCell>
+                                                                    ₹
+                                                                    {payment.amount.toLocaleString("en-IN")}
+                                                                </TableCell>
+                                                                <TableCell>{payment.description || "-"}</TableCell>
+                                                                <TableCell>{formatDate(payment.paymentDate)}</TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex items-center gap-2">
+
+                                                                        <Button
+                                                                            className="h-8 bg-primary px-5 md:px-10 rounded-xl"
+                                                                            onClick={() => handleEditPayment(payment.id)}
+                                                                        >
+                                                                            <Pencil size={14} />
+                                                                            <span className="hidden md:flex">Edit</span>
+                                                                        </Button>
+
+                                                                    </div>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })
+                                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Only show pagination if we have more than one page and no errors */}
+                    {!error && totalPages > 1 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={page => setCurrentPage(page)}
+                        />
+                    )}
                 </div>
-
-                {/* Only show pagination if we have more than one page and no errors */}
-                {!error && totalPages > 1 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={page => setCurrentPage(page)}
-                    />
-                )}
             </div>
-        </div>
+
+            {/* Edit Payment Dialog - Rendered outside main container to avoid UI flash */}
+            {editPaymentId && (
+                <AddPayment
+                    name="Edit Payment"
+                    editPaymentId={editPaymentId}
+                    onSuccess={() => {
+                        refetch();
+                        setShowEditDialog(false);
+                        setTimeout(() => setEditPaymentId(undefined), 300);
+                    }}
+                    open={showEditDialog}
+                    onOpenChange={handleDialogOpenChange}
+                />
+            )}
+        </>
     );
 };
 

@@ -6,7 +6,7 @@ import type {
     PaymentsListResponse,
 } from "@/types/payment";
 
-import { ApiPost } from "./api-helper";
+import { ApiGet, ApiPost, ApiPut } from "./api-helper";
 
 export async function createPayment(data: PaymentCreateRequest): Promise<Payment> {
     try {
@@ -40,6 +40,42 @@ export async function createPayment(data: PaymentCreateRequest): Promise<Payment
 
         throw error;
     }
+}
+
+export async function updatePayment(id: number, data: PaymentCreateRequest): Promise<Payment> {
+    try {
+        if (!data.clientId) {
+            throw new Error("Client ID is required");
+        }
+        if (!data.amount || data.amount <= 0) {
+            throw new Error("Valid payment amount is required");
+        }
+        if (!data.paymentDate) {
+            throw new Error("Payment date is required");
+        }
+
+        const response = await ApiPut<PaymentResponse>(`/payments/update/${id}`, data);
+
+        if (!response || !response.success) {
+            throw new Error(response?.message || "Failed to update payment");
+        }
+
+        return response.data;
+    } catch (error: any) {
+        console.error("Payment update API error:", error);
+        throw error;
+    }
+}
+
+// get payment by ID
+export async function getPaymentById(id: number): Promise<Payment> {
+    const response = await ApiGet<PaymentResponse>(`/payments/get/${id}`);
+
+    if (!response || !response.success) {
+        throw new Error(response?.message || "Failed to fetch payment");
+    }
+
+    return response.data;
 }
 
 export async function getAllPayments(data: PaymentFilterRequest): Promise<PaymentsListResponse> {

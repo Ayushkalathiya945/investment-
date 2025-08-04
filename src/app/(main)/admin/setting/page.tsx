@@ -52,13 +52,11 @@ function Page() {
         defaultValues,
     });
 
-    // Get quarter data for current year
     const { data: currentYearData, isLoading } = useQuery({
         queryKey: ["quarter", selectedYear],
         queryFn: () => getQuartersByYear(selectedYear),
     });
 
-    // Mutation function for create
     const createQuarterMutation = useMutation({
         mutationFn: (quarterData: QuarterFormValues) => createQuarters(quarterData),
         onSuccess: () => {
@@ -71,7 +69,6 @@ function Page() {
         },
     });
 
-    // Update quarter mutation
     const updateQuarterMutation = useMutation({
         mutationFn: (quarterData: QuarterFormValues) => updateQuarters(quarterData.year, quarterData),
         onSuccess: () => {

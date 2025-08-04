@@ -15,23 +15,17 @@ async function getBrokerageRecords(filters: BrokerageFilterRequest) {
             limit = 15,
             periodType = PeriodType.DAILY,
             clientId,
-            // Daily filters
             startDate,
             endDate,
-            // Monthly filters
             startMonth,
             startYear,
             endMonth,
             endYear,
-            // Quarterly filters
             quarter,
             quarterYear,
-            // Generic date range filters
             from,
             to,
         } = filters;
-
-        // console.log("Inside getBrokerageRecords with filters: ", filters);
 
         const response = await ApiPost<BrokerageResponseType>("/brokerage/get-all", {
             page,
@@ -80,7 +74,6 @@ export async function getPeriodicBrokerage(
         page,
         limit,
         periodType,
-        // Use the parameters passed from the UI
         quarter,
         quarterYear,
         startMonth,
@@ -93,7 +86,6 @@ export async function getPeriodicBrokerage(
         to,
     };
 
-    // Fallback logic for backward compatibility with period/year parameters
     if (period !== undefined && !quarter && !startMonth && !from) {
         switch (periodType) {
             case PeriodType.QUARTERLY:
@@ -114,9 +106,8 @@ export async function getPeriodicBrokerage(
                 }
                 break;
             case PeriodType.DAILY:
-                // For daily, we can use startDate/endDate or generic from/to
                 if (year) {
-                    const month = new Date().getMonth() + 1; // Default to current month
+                    const month = new Date().getMonth() + 1;
                     const startDate = new Date(year, month - 1, period);
                     const endDate = new Date(year, month - 1, period);
                     filters.startDate = startDate.toISOString().split("T")[0];
@@ -127,8 +118,6 @@ export async function getPeriodicBrokerage(
     }
 
     try {
-        // console.log("Fetching periodic brokerage with filters:", filters);
-
         const response = await getBrokerageRecords(filters);
         return {
             success: response.success,

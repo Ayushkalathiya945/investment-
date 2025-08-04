@@ -31,6 +31,8 @@ type DailyBrokerageSummary = {
     clientName: string;
     date: Date;
     totalDailyBrokerage: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
 };
 
 export async function findAllDailyBrokerages(data: {
@@ -68,6 +70,8 @@ export async function findAllDailyBrokerages(data: {
         clientName: clients.name,
         date: dailyBrokerage.date,
         totalDailyBrokerage: dailyBrokerage.totalDailyBrokerage,
+        totalHoldingAmount: dailyBrokerage.holdingAmount,
+        totalUnusedAmount: dailyBrokerage.unusedAmount,
     }).from(dailyBrokerage).leftJoin(clients, eq(dailyBrokerage.clientId, clients.id)).where(and(...conditions)).orderBy(desc(dailyBrokerage.date)).limit(data.limit).offset((data.page - 1) * data.limit);
 
     const [{ count }] = await getDB(tx)
@@ -76,12 +80,14 @@ export async function findAllDailyBrokerages(data: {
         .where(and(...conditions));
 
     return {
-        data: result.map((row: { id: number; clientId: number; clientName?: string; date: Date; totalDailyBrokerage: number | string }) => ({
+        data: result.map((row: { id: number; clientId: number; clientName?: string; date: Date; totalDailyBrokerage: number | string; totalHoldingAmount: number | string; totalUnusedAmount: number | string }) => ({
             id: row.id,
             clientId: row.clientId,
             clientName: row.clientName || "Unknown",
             date: row.date,
             totalDailyBrokerage: Number.parseFloat((Number(row.totalDailyBrokerage) || 0).toFixed(2)),
+            totalHoldingAmount: Number.parseFloat((Number(row.totalHoldingAmount) || 0).toFixed(2)),
+            totalUnusedAmount: Number.parseFloat((Number(row.totalUnusedAmount) || 0).toFixed(2)),
         })),
         pagination: {
             page: data.page,
@@ -98,7 +104,9 @@ type MonthlyBrokerageSummary = {
         month: number;
         year: number;
     };
-    brokerageAmount: number; // This is now an alias for totalDailyBrokerage for backward compatibility
+    brokerageAmount: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
 };
 
 export async function getMonthlyBrokerageSummary(
@@ -116,7 +124,6 @@ export async function getMonthlyBrokerageSummary(
     const db = getDB(tx);
 
     try {
-        // Get all clients for name lookup (only if we're not filtering by clientId)
         let clientsMap: Record<number, string> = {};
         if (!clientId) {
             const clients = await db.query.clients.findMany({
@@ -124,7 +131,6 @@ export async function getMonthlyBrokerageSummary(
             });
             clientsMap = Object.fromEntries(clients.map((c: { id: number; name: string }) => [c.id, c.name]));
         } else {
-            // If filtering by clientId, just get that client's name
             const client = await db.query.clients.findFirst({
                 where: (clients: { id: any }, { eq }: { eq: (column: any, value: any) => any }) => eq(clients.id, clientId),
                 columns: { id: true, name: true },
@@ -133,22 +139,9 @@ export async function getMonthlyBrokerageSummary(
                 clientsMap[client.id] = client.name;
             }
         }
-
-        // Convert dates to timestamps for the query
-        // const fromTimestamp = from.getTime() / 1000;
-        // const toTimestamp = to.getTime() / 1000;
-
-        // Debug logging
-        // console.log("Monthly Summary Query:");
-        // console.log("- From:", from, "(", fromTimestamp, ")");
-        // console.log("- To:", to, "(", toTimestamp, ")");
-        // console.log("- Client ID:", clientId || "All clients");
-
-        // Calculate date range for the query
         const startOfMonth = new Date(from.getFullYear(), from.getMonth(), 1);
         const endOfMonth = new Date(to.getFullYear(), to.getMonth() + 1, 0, 23, 59, 59, 999);
 
-        // Query and aggregate monthly data using Drizzle ORM
         const rows = await db.query.dailyBrokerage.findMany({
             with: {
                 client: true,
@@ -161,45 +154,42 @@ export async function getMonthlyBrokerageSummary(
             orderBy: [desc(dailyBrokerage.date)],
         });
 
-        // Create a map to store monthly summaries by client and period
         const monthlySummaries = new Map<string, MonthlyBrokerageSummary>();
 
-        // Process each row and aggregate by month and client
         for (const row of rows) {
             const date = new Date(row.date);
-            const month = date.getMonth() + 1; // getMonth() returns 0-11
+            const month = date.getMonth() + 1;
             const year = date.getFullYear();
             const clientId = row.clientId;
             const clientName = row.client?.name || "Unknown";
 
-            // Create a unique key for this client and period
             const periodKey = `${clientId}-${year}-${month}`;
 
-            // Get or create the summary for this period
             let summary = monthlySummaries.get(periodKey);
             if (!summary) {
                 summary = {
                     clientId,
                     clientName,
                     period: { month, year },
-                    brokerageAmount: 0, // This will store the sum of totalDailyBrokerage
+                    brokerageAmount: 0,
+                    totalHoldingAmount: 0,
+                    totalUnusedAmount: 0,
                 };
                 monthlySummaries.set(periodKey, summary);
             }
 
-            // Add to the total daily brokerage amount
             summary.brokerageAmount += Number(row.totalDailyBrokerage) || 0;
+            summary.totalHoldingAmount += Number(row.holdingAmount) || 0;
+            summary.totalUnusedAmount += Number(row.unusedAmount) || 0;
         }
 
-        // change brokrage amount to 2 decimal places
         monthlySummaries.forEach((summary) => {
             summary.brokerageAmount = Number.parseFloat(summary.brokerageAmount.toFixed(2));
+            summary.totalHoldingAmount = Number.parseFloat(summary.totalHoldingAmount.toFixed(2));
+            summary.totalUnusedAmount = Number.parseFloat(summary.totalUnusedAmount.toFixed(2));
         });
 
-        // Convert the map values to an array and sort by year and month (newest first)
         return Array.from(monthlySummaries.values()).sort((a, b) => {
-            // Sort by year descending, then by month descending
-
             if (a.period.year !== b.period.year) {
                 return b.period.year - a.period.year;
             }
@@ -219,6 +209,8 @@ type QuarterlyBrokerageSummary = {
         year: number;
     };
     brokerageAmount: number;
+    totalHoldingAmount: number;
+    totalUnusedAmount: number;
 };
 
 export async function getQuarterlyBrokerageSummary(
@@ -254,16 +246,6 @@ export async function getQuarterlyBrokerageSummary(
             }
         }
 
-        // Convert dates to timestamps for the query
-        // const fromTimestamp = from.getTime();
-        // const toTimestamp = to.getTime();
-
-        // Debug logging
-        // console.log("Quarterly Summary Query:");
-        // console.log("- From:", from, "(", fromTimestamp, ")");
-        // console.log("- To:", to, "(", toTimestamp, ")");
-        // console.log("- Client ID:", clientId || "All clients");
-
         // Calculate date range for the query
         const startOfQuarter = new Date(from.getFullYear(), from.getMonth(), 1);
         const endOfQuarter = new Date(to.getFullYear(), to.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -288,6 +270,8 @@ export async function getQuarterlyBrokerageSummary(
             quarter: number;
             year: number;
             brokerageAmount: number;
+            totalHoldingAmount: number;
+            totalUnusedAmount: number;
         }>();
 
         // Process each daily record
@@ -307,11 +291,15 @@ export async function getQuarterlyBrokerageSummary(
                     quarter,
                     year,
                     brokerageAmount: 0,
+                    totalHoldingAmount: 0,
+                    totalUnusedAmount: 0,
                 });
             }
 
             const quarterData = quarterlyMap.get(key)!;
             quarterData.brokerageAmount += Number(record.totalDailyBrokerage) || 0;
+            quarterData.totalHoldingAmount += Number(record.holdingAmount) || 0;
+            quarterData.totalUnusedAmount += Number(record.unusedAmount) || 0;
         }
 
         // Convert the map to an array and format the response
@@ -323,6 +311,8 @@ export async function getQuarterlyBrokerageSummary(
                 year: quarterData.year,
             },
             brokerageAmount: Number.parseFloat((quarterData.brokerageAmount || 0).toFixed(2)),
+            totalHoldingAmount: Number.parseFloat((quarterData.totalHoldingAmount || 0).toFixed(2)),
+            totalUnusedAmount: Number.parseFloat((quarterData.totalUnusedAmount || 0).toFixed(2)),
         }));
     } catch (error) {
         console.error("Error in getQuarterlyBrokerageSummary:", error);
@@ -330,12 +320,9 @@ export async function getQuarterlyBrokerageSummary(
     }
 }
 
-// Calculate the total brokerage amount for a client or time period
 export async function calculateTotalbrokerageAmount(data: {
     clientId: number;
 }, tx?: TransactionType) {
-    // console.log("[DEBUG] Total brokerage calculation params:", data);
-
     try {
         const db = getDB(tx);
 
@@ -346,7 +333,6 @@ export async function calculateTotalbrokerageAmount(data: {
             .from(dailyBrokerage)
             .where(eq(dailyBrokerage.clientId, data.clientId));
 
-        // Extract totalAmount or default to 0
         return dailyBrokerageResult[0]?.totalAmount ?? 0;
     } catch (error) {
         console.error("[ERROR] Failed to calculate total brokerage amount:", error);

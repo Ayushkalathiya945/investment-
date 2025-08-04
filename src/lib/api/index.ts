@@ -11,7 +11,7 @@ import clientRouter from "../api/routes/clients";
 import paymentRouter from "../api/routes/payments";
 import tradeRouter from "../api/routes/trades";
 import quarterRouter from "./routes/quarter";
-import readCsv from "./routes/stocks";
+import stockRouter from "./routes/stocks";
 
 // Create Hono app
 const api = new Hono().basePath("/api");
@@ -31,16 +31,14 @@ api.get("/", (c) => {
     });
 });
 
-// Mount routes
+// Routes
 api.route("/auth", authRouter);
 api.route("/clients", clientRouter);
 api.route("/trades", tradeRouter);
 api.route("/brokerage", brokerageRouter);
 api.route("/payments", paymentRouter);
 api.route("/quarter", quarterRouter);
-
-// read csvs and store it
-api.route("/stocks", readCsv);
+api.route("/stocks", stockRouter);
 
 // Export the Hono app
 export default api;

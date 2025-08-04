@@ -19,7 +19,7 @@ type MonthRangePickerProps = {
     onChange: (range: MonthRange) => void;
 };
 
-function getYears(start = 2020, end = new Date().getFullYear() + 5) {
+function getYears(start = new Date().getFullYear() - 3, end = new Date().getFullYear() + 5) {
     const years = [];
     for (let y = start; y <= end; y++) years.push(y);
     return years;

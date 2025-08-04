@@ -1,6 +1,6 @@
 "use client";
 
-import { addMonths, endOfMonth, format, startOfMonth } from "date-fns";
+import { addMonths, endOfMonth, startOfMonth } from "date-fns";
 import { Loader2, TrendingUp } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
@@ -23,11 +23,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PAGE_LIMIT } from "@/lib/constants";
 import { PeriodType as ApiPeriodType } from "@/types/brokerage";
 
-function _formatDateString(date: Date): string {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+function formatDate(date: Date): string {
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    // console.log("Date to format:", date);
+
+    // console.log("Formatted date:", `${yyyy}-${mm}-${dd}`);
+
+    return `${yyyy}-${mm}-${dd}`;
 }
 
-// PeriodType enum for UI only
 const PeriodType = {
     DAILY: "DAILY",
     MONTHLY: "MONTHLY",
@@ -54,25 +60,20 @@ const Brokerage: React.FC = () => {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // Helper function to update URL with current filter state
     const updateURL = useCallback((params: Record<string, string | number | undefined>) => {
         const newSearchParams = new URLSearchParams(searchParams.toString());
 
-        // Preserve clientId if it exists
         const currentClientId = searchParams.get("clientId");
 
-        // Clear all existing filter params first
         const filterKeys = ["periodType", "page", "selectedMonthYear", "monthFrom", "monthTo", "selectedQuarter", "selectedQuarterYear", "dateFrom", "dateTo"];
         filterKeys.forEach(key => newSearchParams.delete(key));
 
-        // Add new params
         Object.entries(params).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== "") {
                 newSearchParams.set(key, value.toString());
             }
         });
 
-        // Restore clientId if it existed and wasn't explicitly changed
         if (currentClientId && !("clientId" in params)) {
             newSearchParams.set("clientId", currentClientId);
         }
@@ -80,7 +81,6 @@ const Brokerage: React.FC = () => {
         router.push(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
     }, [searchParams, router, pathname]);
 
-    // Initialize state from URL parameters
     const initializeFromURL = useCallback(() => {
         const urlPeriodType = searchParams.get("periodType") as PeriodType || "MONTHLY";
         const urlPage = Number.parseInt(searchParams.get("page") || "1");
@@ -102,25 +102,22 @@ const Brokerage: React.FC = () => {
         };
     }, [searchParams]);
 
-    // UI state initialized from URL
     const [periodType, setPeriodType] = useState<PeriodType>(() => {
         const urlParams = initializeFromURL();
         return urlParams.periodType;
     });
-    // Pagination
+
     const [currentPage, setCurrentPage] = useState(() => {
         const urlParams = initializeFromURL();
         return urlParams.page;
     });
     const [totalPages, setTotalPages] = useState(1);
 
-    // clientID
     const [clientId, setClientId] = useState<number | undefined>(() => {
         const urlParams = initializeFromURL();
         return urlParams.clientId ? Number.parseInt(urlParams.clientId) : undefined;
     });
 
-    // Daily (date range)
     const [selectedDateRange, setSelectedDateRange] = useState<{ from?: Date; to?: Date }>(() => {
         const urlParams = initializeFromURL();
         return {
@@ -129,7 +126,6 @@ const Brokerage: React.FC = () => {
         };
     });
 
-    // Monthly
     const [monthRange, setMonthRange] = useState<{ from: Date; to: Date }>(() => {
         const urlParams = initializeFromURL();
         if (urlParams.monthFrom && urlParams.monthTo) {
@@ -148,7 +144,7 @@ const Brokerage: React.FC = () => {
         const urlParams = initializeFromURL();
         return urlParams.selectedMonthYear;
     });
-    // Quarterly
+
     const [selectedQuarter, setSelectedQuarter] = useState<number>(() => {
         const urlParams = initializeFromURL();
         return urlParams.selectedQuarter;
@@ -162,29 +158,26 @@ const Brokerage: React.FC = () => {
     const [totalBrokerageAmount, setTotalBrokerageAmount] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [_serverPaginationData, _setServerPaginationData] = useState<{ totalPages: number; total: number }>({ totalPages: 1, total: 0 });
-    // State for clients dropdown
     const [clients, setClients] = useState<{ id: number; name: string }[]>([]);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
 
-    // Sync current state to URL
     const syncStateToURL = useCallback(() => {
         const params: Record<string, string | number | undefined> = {
             periodType,
             page: currentPage,
         };
 
-        // Add period-specific parameters
         switch (periodType) {
             case "DAILY":
                 if (selectedDateRange.from)
-                    params.dateFrom = selectedDateRange.from.toISOString().split("T")[0];
+                    params.dateFrom = formatDate(selectedDateRange.from);
                 if (selectedDateRange.to)
-                    params.dateTo = selectedDateRange.to.toISOString().split("T")[0];
+                    params.dateTo = formatDate(selectedDateRange.to);
                 break;
             case "MONTHLY":
                 params.selectedMonthYear = selectedMonthYear;
-                params.monthFrom = monthRange.from.toISOString().split("T")[0];
-                params.monthTo = monthRange.to.toISOString().split("T")[0];
+                params.monthFrom = formatDate(monthRange.from);
+                params.monthTo = formatDate(monthRange.to);
                 break;
             case "QUARTERLY":
                 params.selectedQuarter = selectedQuarter;
@@ -195,7 +188,6 @@ const Brokerage: React.FC = () => {
         updateURL(params);
     }, [periodType, currentPage, selectedDateRange, selectedMonthYear, monthRange, selectedQuarter, selectedQuarterYear, updateURL]);
 
-    // Fetch clients for dropdown
     useEffect(() => {
         const fetchClients = async () => {
             setIsLoadingClients(true);
@@ -227,22 +219,17 @@ const Brokerage: React.FC = () => {
         setCurrentPage(1);
     };
 
-    // Fetch data based on period type and filters
     const fetchBrokerageData = useCallback(async () => {
         setIsLoading(true);
-
-        // Sync state to URL before fetching
         syncStateToURL();
         try {
             let apiPeriodType: ApiPeriodType;
             let period: number | undefined;
             let year: number | undefined;
 
-            // Map UI period type to API period type and set appropriate filters
             switch (periodType) {
                 case "DAILY":
                     apiPeriodType = ApiPeriodType.DAILY;
-                    // For daily, we'll use the date range
                     break;
                 case "MONTHLY":
                     apiPeriodType = ApiPeriodType.MONTHLY;
@@ -257,50 +244,31 @@ const Brokerage: React.FC = () => {
                     apiPeriodType = ApiPeriodType.MONTHLY;
             }
 
-            // Log filter data for debugging
-            // console.log("API Call Parameters:", {
-            //     periodType: apiPeriodType,
-            //     period,
-            //     year,
-            //     currentPage,
-            //     limit: PAGE_LIMIT,
-            //     uiPeriodType: periodType,
-            //     selectedDateRange: periodType === "DAILY" ? selectedDateRange : null,
-            //     selectedMonthYear: periodType === "MONTHLY" ? selectedMonthYear : null,
-            //     selectedQuarter: periodType === "QUARTERLY" ? selectedQuarter : null,
-            //     selectedQuarterYear: periodType === "QUARTERLY" ? selectedQuarterYear : null,
-            // });
-
             const response = await getPeriodicBrokerage(
                 clientId?.toString(),
-                apiPeriodType, // periodType
-                period, // period
-                year, // year
-                currentPage, // page
-                PAGE_LIMIT, // limit
-                periodType === "QUARTERLY" ? selectedQuarter : undefined, // quarter
-                periodType === "QUARTERLY" ? selectedQuarterYear : undefined, // quarterYear
-                periodType === "MONTHLY" ? (monthRange.from.getMonth() + 1) : undefined, // startMonth
-                periodType === "MONTHLY" ? monthRange.from.getFullYear() : undefined, // startYear
-                periodType === "MONTHLY" ? (monthRange.to.getMonth() + 1) : undefined, // endMonth
-                periodType === "MONTHLY" ? monthRange.to.getFullYear() : undefined, // endYear
-                periodType === "DAILY" && selectedDateRange.from ? selectedDateRange.from.toISOString().split("T")[0] : undefined, // startDate
-                periodType === "DAILY" && selectedDateRange.to ? selectedDateRange.to.toISOString().split("T")[0] : undefined, // endDate
-                periodType === "DAILY" && selectedDateRange.from ? selectedDateRange.from.toISOString().split("T")[0] : undefined, // from
-                periodType === "DAILY" && selectedDateRange.to ? selectedDateRange.to.toISOString().split("T")[0] : undefined, // to
+                apiPeriodType,
+                period,
+                year,
+                currentPage,
+                PAGE_LIMIT,
+                periodType === "QUARTERLY" ? selectedQuarter : undefined,
+                periodType === "QUARTERLY" ? selectedQuarterYear : undefined,
+                periodType === "MONTHLY" ? (monthRange.from.getMonth() + 1) : undefined,
+                periodType === "MONTHLY" ? monthRange.from.getFullYear() : undefined,
+                periodType === "MONTHLY" ? (monthRange.to.getMonth() + 1) : undefined,
+                periodType === "MONTHLY" ? monthRange.to.getFullYear() : undefined,
+                periodType === "DAILY" && selectedDateRange.from ? formatDate(selectedDateRange.from) : undefined, // startDate
+                periodType === "DAILY" && selectedDateRange.to ? formatDate(selectedDateRange.to) : undefined, // endDate
+                periodType === "DAILY" && selectedDateRange.from ? formatDate(selectedDateRange.from) : undefined, // from
+                periodType === "DAILY" && selectedDateRange.to ? formatDate(selectedDateRange.to) : undefined, // to
             );
 
-            // Log API response for debugging
-            // console.log("API Response:", response);
-
             if (response.success && response.data) {
-                // Handle the response data structure properly
                 let dataArray: (DailyBrokerageRecord | MonthlyBrokerageSummary | QuarterlyBrokerageSummary)[] = [];
 
                 if (Array.isArray(response.data)) {
                     dataArray = response.data;
                 } else if (typeof response.data === "object" && response.data !== null) {
-                    // Handle legacy response structure
                     if (response.data.daily) {
                         dataArray = response.data.daily.map(item => ({
                             id: item.id,
@@ -308,23 +276,26 @@ const Brokerage: React.FC = () => {
                             clientName: item.clientName,
                             date: new Date(item.date),
                             totalDailyBrokerage: item.totalDailyBrokerage,
+                            totalHoldingAmount: item.totalHoldingAmount,
+                            totalUnusedAmount: item.totalUnusedAmount,
                         }));
                     } else if (response.data.quarterly) {
                         dataArray = response.data.quarterly.map(item => ({
                             clientId: item.clientId,
-                            clientName: `Client ${item.clientId}`, // Fallback if name not available
+                            clientName: `Client ${item.clientId}`,
                             period: {
                                 quarter: item.quarter,
                                 year: item.year,
                             },
                             brokerageAmount: item.totalBrokerage,
+                            totalHoldingAmount: item.totalHoldingAmount,
+                            totalUnusedAmount: item.totalUnusedAmount,
                         }));
                     }
                 }
 
                 setBrokerageData(dataArray);
 
-                // Calculate total brokerage amount
                 const total = dataArray.reduce((sum: number, item: any) => {
                     if ("totalDailyBrokerage" in item) {
                         return sum + item.totalDailyBrokerage;
@@ -335,7 +306,6 @@ const Brokerage: React.FC = () => {
                 }, 0);
                 setTotalBrokerageAmount(total);
 
-                // Update pagination data
                 if (response.metadata) {
                     _setServerPaginationData({
                         totalPages: response.metadata.totalPages,
@@ -359,22 +329,18 @@ const Brokerage: React.FC = () => {
         }
     }, [clientId, periodType, selectedMonthYear, monthRange, selectedQuarter, selectedQuarterYear, currentPage, selectedDateRange, syncStateToURL]);
 
-    // Fetch data when component mounts or dependencies change
     useEffect(() => {
         fetchBrokerageData();
     }, [fetchBrokerageData]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
-        // URL will be updated by fetchBrokerageData via syncStateToURL
     };
 
-    // Handle period type change with URL clearing
     const handlePeriodTypeChange = (newPeriodType: PeriodType) => {
         setPeriodType(newPeriodType);
-        setCurrentPage(1); // Reset to first page
+        setCurrentPage(1);
 
-        // Clear URL parameters and set new period type
         const params: Record<string, string | number | undefined> = {
             periodType: newPeriodType,
             page: 1,
@@ -382,7 +348,6 @@ const Brokerage: React.FC = () => {
 
         updateURL(params);
 
-        // Reset state based on period type
         if (newPeriodType === "DAILY") {
             setSelectedDateRange({
                 from: startOfMonth(new Date()),
@@ -435,7 +400,6 @@ const Brokerage: React.FC = () => {
                         </Select>
                     </div>
 
-                    {/* Period Type Dropdown */}
                     <div className="flex min-w-50">
                         <Select
                             value={periodType}
@@ -452,20 +416,18 @@ const Brokerage: React.FC = () => {
                         </Select>
                     </div>
 
-                    {/* Daily: Date Range Picker Button with Popover */}
                     {periodType === "DAILY" && (
                         <div className="w-full md:w-auto">
 
                             <RangeDatePicker
-                                from={selectedDateRange.from ? format(selectedDateRange.from, "yyyy-MM-dd") : undefined}
-                                to={selectedDateRange.to ? format(selectedDateRange.to, "yyyy-MM-dd") : undefined}
+                                from={selectedDateRange.from ? formatDate(selectedDateRange.from) : undefined}
+                                to={selectedDateRange.to ? formatDate(selectedDateRange.to) : undefined}
                                 onChange={(range: { from?: Date; to?: Date }) => setSelectedDateRange(range)}
                             />
 
                         </div>
                     )}
 
-                    {/* Monthly: Month Range Picker and Year Selector */}
                     {periodType === "MONTHLY" && (
                         <>
 
@@ -476,14 +438,13 @@ const Brokerage: React.FC = () => {
                                             setMonthRange({ from: new Date(range.from), to: new Date(range.to) });
                                         }
                                     }}
-                                    from={monthRange.from ? format(monthRange.from, "yyyy-MM-dd") : undefined}
-                                    to={monthRange.to ? format(monthRange.to, "yyyy-MM-dd") : undefined}
+                                    from={monthRange.from ? formatDate(monthRange.from) : undefined}
+                                    to={monthRange.to ? formatDate(monthRange.to) : undefined}
                                 />
                             </div>
                         </>
                     )}
 
-                    {/* Quarterly: Year and Quarter Selectors */}
                     {periodType === "QUARTERLY" && (
                         <>
                             <div className="flex min-w-50 ml-0 md:ml-2 mt-2 md:mt-0">
@@ -528,21 +489,24 @@ const Brokerage: React.FC = () => {
                     value={new Intl.NumberFormat("en-IN", {
                         style: "currency",
                         currency: "INR",
-                        maximumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                        minimumFractionDigits: 2,
                     }).format(totalBrokerageAmount)}
                     label="Total Fees"
                     isLoading={isLoading}
                 />
             </div>
-            <div className="h-full flex flex-col flex-grow gap-10 justify-between">
-                <div className="w-full h-full flex flex-col justify-between border rounded-xl border-[#EFF6FF]">
-                    <Table className="bg-white">
+            <div className="h-full flex flex-col flex-grow gap-6 justify-between">
+                <div className="w-full h-full flex flex-col justify-between border rounded-xl border-[#EFF6FF] overflow-hidden">
+                    <Table className="bg-white w-full">
                         <TableHeader>
-                            <TableRow className="bg-[#F9F9F9] text-[16px] font-semibold  w-full justify-between items-center gap-4 rounded-lg py-3">
-                                <TableHead className="rounded-tl-xl">No.</TableHead>
-                                <TableHead>Client</TableHead>
-                                <TableHead>Total Fees</TableHead>
-                                <TableHead className="rounded-tr-xl">
+                            <TableRow className="bg-[#F9F9F9] text-[14px] font-semibold border-b border-gray-200">
+                                <TableHead className="rounded-tl-xl py-4 px-6 text-left font-medium text-gray-700 w-[8%]">No.</TableHead>
+                                <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[20%]">Client</TableHead>
+                                <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[18%]">Total Holding Amount</TableHead>
+                                <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[18%]">Total Unused Amount</TableHead>
+                                <TableHead className="py-4 px-6 text-left font-medium text-gray-700 w-[18%]">Total Fees</TableHead>
+                                <TableHead className="rounded-tr-xl py-4 px-6 text-left font-medium text-gray-700 w-[18%]">
                                     {periodType === "QUARTERLY"
                                         ? "Quarter"
                                         : periodType === "MONTHLY"
@@ -554,16 +518,19 @@ const Brokerage: React.FC = () => {
                         <TableBody>
                             {isLoading
                                 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8">
-                                                Loading...
+                                        <TableRow className="border-b border-gray-100">
+                                            <TableCell colSpan={6} className="text-center py-12 text-gray-500">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Loading...
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     )
                                 : brokerageData.length === 0
                                     ? (
-                                            <TableRow>
-                                                <TableCell colSpan={4} className="text-center py-8">
+                                            <TableRow className="border-b border-gray-100">
+                                                <TableCell colSpan={6} className="text-center py-12 text-gray-500">
                                                     No data available
                                                 </TableCell>
                                             </TableRow>
@@ -572,20 +539,23 @@ const Brokerage: React.FC = () => {
                                             brokerageData.map((item, index) => {
                                                 const serialNumber = (currentPage - 1) * PAGE_LIMIT + index + 1;
 
-                                                // Determine the display values based on item type
                                                 let clientName = "";
                                                 let amount = 0;
                                                 let periodDisplay = "";
+                                                let totalHoldingAmount = 0;
+                                                let totalUnusedAmount = 0;
 
                                                 if ("totalDailyBrokerage" in item) {
-                                                // Daily brokerage record
                                                     clientName = item.clientName;
                                                     amount = item.totalDailyBrokerage;
                                                     periodDisplay = new Date(item.date).toLocaleDateString();
+                                                    totalHoldingAmount = item.totalHoldingAmount;
+                                                    totalUnusedAmount = item.totalUnusedAmount;
                                                 } else if ("brokerageAmount" in item) {
-                                                // Monthly or Quarterly summary
                                                     clientName = item.clientName;
                                                     amount = item.brokerageAmount;
+                                                    totalHoldingAmount = item.totalHoldingAmount;
+                                                    totalUnusedAmount = item.totalUnusedAmount;
 
                                                     if ("period" in item && typeof item.period === "object") {
                                                         if ("quarter" in item.period) {
@@ -599,17 +569,27 @@ const Brokerage: React.FC = () => {
 
                                                 const uniqueKey = `client-${item.clientId}-period-${periodDisplay.replace(/\s+/g, "-").toLowerCase()}`;
                                                 return (
-                                                    <TableRow key={uniqueKey}>
-                                                        <TableCell>{serialNumber}</TableCell>
-                                                        <TableCell>{clientName}</TableCell>
-                                                        <TableCell className="text-green-500">
+                                                    <TableRow key={uniqueKey} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                                        <TableCell className="py-4 px-6 text-sm text-gray-900 font-medium">{serialNumber}</TableCell>
+                                                        <TableCell className="py-4 px-6 text-sm text-gray-900 font-medium">{clientName}</TableCell>
+                                                        <TableCell className="py-4 px-6 text-sm text-gray-700">
+                                                            {new Intl.NumberFormat("en-IN", {
+                                                                maximumFractionDigits: 2,
+                                                            }).format(totalHoldingAmount)}
+                                                        </TableCell>
+                                                        <TableCell className="py-4 px-6 text-sm text-gray-700">
+                                                            {new Intl.NumberFormat("en-IN", {
+                                                                maximumFractionDigits: 2,
+                                                            }).format(totalUnusedAmount)}
+                                                        </TableCell>
+                                                        <TableCell className="py-4 px-6 text-sm text-green-600">
                                                             {new Intl.NumberFormat("en-IN", {
                                                                 style: "currency",
                                                                 currency: "INR",
                                                                 maximumFractionDigits: 2,
                                                             }).format(amount)}
                                                         </TableCell>
-                                                        <TableCell>{periodDisplay}</TableCell>
+                                                        <TableCell className="py-4 px-6 text-sm text-gray-700">{periodDisplay}</TableCell>
                                                     </TableRow>
                                                 );
                                             })
