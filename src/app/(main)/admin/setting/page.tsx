@@ -172,7 +172,7 @@ function Page() {
             queryClient.invalidateQueries({ queryKey: ["quarter"] });
         },
         onError: () => {
-            toast.error("Failed to refresh holidays data. Please try again." );
+            toast.error("Failed to refresh holidays data. Please try again.");
         },
     });
 
