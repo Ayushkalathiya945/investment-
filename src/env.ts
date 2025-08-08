@@ -8,6 +8,7 @@ const EnvSchema = z.object({
     JWT_SECRET: z.string().nonempty(),
     ADMIN_PASSWORD: z.string().nonempty(),
     NEXT_PUBLIC_BACKEND_URL: z.string().url().nonempty().optional().or(z.undefined()),
+    HOLIDAY_API_KEY: z.string().nonempty(),
 });
 export type EnvSchema = z.infer<typeof EnvSchema>;
 

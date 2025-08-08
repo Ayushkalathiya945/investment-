@@ -7,7 +7,6 @@ import type { TransactionType } from "../index";
 import { getDB } from "../index";
 import { clients, dailyBrokerage } from "../schema";
 
-// Daily Brokerage Functions
 export async function createDailyBrokerage(data: Partial<DailyBrokerage>, tx?: TransactionType) {
     const [daily] = await getDB(tx).insert(dailyBrokerage).values(data).returning();
     return daily ?? null;
@@ -24,7 +23,6 @@ export async function findDailyBrokerages(clientId: number, fromDate: Date, toDa
     });
 }
 
-// Daily Brokerage Pagination
 type DailyBrokerageSummary = {
     id: number;
     clientId: number;
@@ -55,15 +53,17 @@ export async function findAllDailyBrokerages(data: {
         conditions.push(eq(dailyBrokerage.clientId, Number(data.clientId)));
     }
 
-    // Only apply date range filters if explicitly provided
     if (data.from) {
-        conditions.push(gte(dailyBrokerage.date, data.from));
+        const fromDate = new Date(data.from);
+        fromDate.setHours(0, 0, 0, 0);
+        conditions.push(gte(dailyBrokerage.date, fromDate));
     }
     if (data.to) {
-        conditions.push(lte(dailyBrokerage.date, data.to));
+        const toDate = new Date(data.to);
+        toDate.setHours(23, 59, 59, 999);
+        conditions.push(lte(dailyBrokerage.date, toDate));
     }
 
-    // Get daily brokerage data with only necessary fields
     const result = await getDB(tx).select({
         id: dailyBrokerage.id,
         clientId: dailyBrokerage.clientId,

@@ -548,7 +548,12 @@ const Brokerage: React.FC = () => {
                                                 if ("totalDailyBrokerage" in item) {
                                                     clientName = item.clientName;
                                                     amount = item.totalDailyBrokerage;
-                                                    periodDisplay = new Date(item.date).toLocaleDateString();
+                                                    periodDisplay = new Date(item.date).toLocaleDateString("en-GB", {
+                                                        day: "2-digit",
+                                                        month: "2-digit",
+                                                        year: "numeric",
+                                                    });
+
                                                     totalHoldingAmount = item.totalHoldingAmount;
                                                     totalUnusedAmount = item.totalUnusedAmount;
                                                 } else if ("brokerageAmount" in item) {

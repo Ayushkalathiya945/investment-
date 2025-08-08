@@ -65,6 +65,17 @@ CREATE TABLE `holdings` (
 	FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `holidays` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`date` text NOT NULL,
+	`exchange` text NOT NULL,
+	`name` text NOT NULL,
+	`is_closed` integer DEFAULT 1,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `holidays_date_exchange_unique` ON `holidays` (`date`,`exchange`);--> statement-breakpoint
 CREATE TABLE `payments` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`client_id` integer NOT NULL,

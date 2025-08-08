@@ -10,6 +10,7 @@ import brokerageRouter from "../api/routes/brokerage";
 import clientRouter from "../api/routes/clients";
 import paymentRouter from "../api/routes/payments";
 import tradeRouter from "../api/routes/trades";
+import holidayRouter from "./routes/holiday";
 import quarterRouter from "./routes/quarter";
 import stockRouter from "./routes/stocks";
 
@@ -39,6 +40,7 @@ api.route("/brokerage", brokerageRouter);
 api.route("/payments", paymentRouter);
 api.route("/quarter", quarterRouter);
 api.route("/stocks", stockRouter);
+api.route("/holidays", holidayRouter);
 
 // Export the Hono app
 export default api;

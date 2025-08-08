@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/api/db";
 
@@ -61,6 +61,22 @@ export async function update(id: number, data: UpdateQuarter) {
         }
         throw error;
     }
+}
+
+export async function addAllQuarters(quarterData: CreateQuarter[]) {
+    const newQuarters = await db
+        .insert(quarters)
+        .values(quarterData)
+        .onConflictDoUpdate({
+            target: [quarters.year, quarters.quarterNumber],
+            set: {
+                daysInQuarter: sql`excluded.days_in_quarter`,
+                updatedAt: new Date(),
+            },
+        })
+        .returning();
+
+    return newQuarters;
 }
 
 export type { CreateQuarter, UpdateQuarter };

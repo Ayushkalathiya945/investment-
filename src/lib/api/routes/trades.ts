@@ -111,9 +111,15 @@ async function updateTrade(
     },
     tx?: TransactionType,
 ): Promise<Trade> {
-    const existingTrade = await tradeQueries.findOne({ id: tradeId }, tx);
+    const existingTrade: Trade = await tradeQueries.findOne({ id: tradeId }, tx);
     if (!existingTrade) {
         throw new HTTPException(404, { message: "Trade not found" });
+    }
+
+    if (existingTrade.type === TradeType.BUY && existingTrade.quantity !== existingTrade.remainingQuantity) {
+        throw new HTTPException(409, {
+            message: "Cannot update BUY trade because some quantity has already been sold.",
+        });
     }
 
     if (existingTrade.brokerageCalculatedDate) {

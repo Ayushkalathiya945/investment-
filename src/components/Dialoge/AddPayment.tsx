@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
@@ -106,12 +106,11 @@ const AddPayment: React.FC<AddPaymentProps> = ({
         }
     };
 
-    const fetchPaymentData = async (paymentId: number) => {
+    const fetchPaymentData = useCallback(async (paymentId: number) => {
         setIsLoadingPayment(true);
         try {
             const payment = await getPaymentById(paymentId);
 
-            // Update form with payment data
             addPaymentForm.reset({
                 client: String(payment.clientId),
                 date: new Date(payment.paymentDate).toISOString(),
@@ -124,7 +123,7 @@ const AddPayment: React.FC<AddPaymentProps> = ({
         } finally {
             setIsLoadingPayment(false);
         }
-    };
+    }, [addPaymentForm]);
 
     useEffect(() => {
         if (dialogOpen) {
@@ -142,7 +141,7 @@ const AddPayment: React.FC<AddPaymentProps> = ({
                 });
             }
         }
-    }, [dialogOpen, clientId, editPaymentId, isEditMode, addPaymentForm]);
+    }, [dialogOpen, clientId, editPaymentId, isEditMode, addPaymentForm, fetchPaymentData]);
 
     const createPaymentMutation = useMutation({
         mutationFn: (paymentData: PaymentCreateRequest) => {
@@ -240,12 +239,12 @@ const AddPayment: React.FC<AddPaymentProps> = ({
 
                 <div className="grid gap-4 py-4">
                     {
-                    // (isLoadingClients || isLoadingPayment) && (
-                    //     <div className="flex justify-center items-center py-4">
-                    //         <Loader2 className="h-6 w-6 animate-spin" />
-                    //         <span className="ml-2">Loading...</span>
-                    //     </div>
-                    // )
+                        // (isLoadingClients || isLoadingPayment) && (
+                        //     <div className="flex justify-center items-center py-4">
+                        //         <Loader2 className="h-6 w-6 animate-spin" />
+                        //         <span className="ml-2">Loading...</span>
+                        //     </div>
+                        // )
                     }
                     <Form {...addPaymentForm}>
                         <form className="flex flex-col gap-4 w-full">

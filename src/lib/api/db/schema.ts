@@ -178,6 +178,19 @@ export const holdings = sqliteTable("holdings", {
     updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
 });
 
+// holidays table
+export const holidays = sqliteTable("holidays", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    date: text("date").notNull(),
+    exchange: text("exchange", { enum: ["NSE", "BSE"] }).notNull(),
+    name: text("name").notNull(),
+    isClosed: int("is_closed").default(1),
+    createdAt: int("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: int("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
+}, table => ({
+    uniqueDateExchange: unique().on(table.date, table.exchange),
+}));
+
 // ===== RELATIONS =====
 
 export const clientRelations = relations(clients, ({ many }) => ({
@@ -264,3 +277,6 @@ export type NewPayment = typeof payments.$inferInsert;
 
 export type Quarter = typeof quarters.$inferSelect;
 export type NewQuarter = typeof quarters.$inferInsert;
+
+export type Holiday = typeof holidays.$inferSelect;
+export type NewHoliday = typeof holidays.$inferInsert;

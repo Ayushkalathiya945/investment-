@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
@@ -43,7 +43,7 @@ const AddClient: React.FC<AddClientProps> = ({
 }) => {
     const [open, setOpen] = useState(false);
 
-    const [isEditing, setIsEditing] = useState(false);
+    const isEditing = useMemo(() => Boolean(data?.id), [data?.id]);
 
     const queryClient = useQueryClient();
     const addClientForm = useForm<AddClientField>({
@@ -61,7 +61,6 @@ const AddClient: React.FC<AddClientProps> = ({
 
     const handleOpenChange = (newOpen: boolean) => {
         if (newOpen && data?.id) {
-            setIsEditing(true);
             addClientForm.setValue("name", data.name || "");
             addClientForm.setValue("panNo", data.panNo || "");
             addClientForm.setValue("mobileNo", data.mobileNo || "");
@@ -69,7 +68,6 @@ const AddClient: React.FC<AddClientProps> = ({
             addClientForm.setValue("address", data.address || "");
             addClientForm.setValue("purseAmount", data.purseAmount || 0);
         } else if (!newOpen) {
-            setIsEditing(false);
             addClientForm.reset();
         }
 
@@ -198,8 +196,6 @@ const AddClient: React.FC<AddClientProps> = ({
 
     useEffect(() => {
         if (open && data && data.id) {
-            setIsEditing(true);
-            // Always reset first, then set new values
             addClientForm.reset({
                 name: data.name || "",
                 panNo: data.panNo || "",
@@ -209,7 +205,6 @@ const AddClient: React.FC<AddClientProps> = ({
                 purseAmount: data.purseAmount || 0,
             });
         } else if (open) {
-            setIsEditing(false);
             addClientForm.reset({
                 name: "",
                 panNo: "",

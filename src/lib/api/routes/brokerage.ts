@@ -38,7 +38,6 @@ brokerageRouter.post("/get-all", zValidator("json", brokerageFilterSchema), asyn
     const validatedPeriodType = Object.values(PeriodType).includes(periodType)
         ? periodType
         : PeriodType.DAILY;
-
     try {
         const formatDate = (dateStr: string): Date => {
             return new Date(dateStr);

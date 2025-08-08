@@ -37,7 +37,6 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-import DatePicker from "../ui/datePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type AddTradeProps = {
@@ -103,6 +102,18 @@ const AddTrade: React.FC<AddTradeProps> = ({
     const queryClient = useQueryClient();
     const isEditMode = Boolean(editTradeId);
 
+    // Define default values
+    const getDefaultValues = () => ({
+        clientId: clientId || undefined,
+        symbol: "",
+        exchange: undefined,
+        tradeType: undefined,
+        quantity: undefined,
+        price: undefined,
+        tradeDate: formatDateForTradeApi(new Date()),
+        notes: "",
+    });
+
     const tradeForm = useForm<TradeFormValues>({
         defaultValues: {
             clientId: clientId || undefined,
@@ -117,6 +128,15 @@ const AddTrade: React.FC<AddTradeProps> = ({
         resolver: zodResolver(tradeSchema),
         mode: "onSubmit",
     });
+
+    // Reset function that clears all state
+    const resetAllState = () => {
+        tradeForm.reset(getDefaultValues());
+        setSearchTerm("");
+        setClientSearchTerm("");
+        setOpenStockPopover(false);
+        setOpenClientPopover(false);
+    };
 
     const { data: clientsDropdown = [], isLoading: loadingClients } = useQuery({
         queryKey: ["clientsDropdown"],
@@ -195,7 +215,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                         formattedTradeDate = tradeData.tradeDate.toISOString().split("T")[0];
                     }
                 } else {
-                    console.warn("Trade date is missing, using current date");
+                    // console.warn("Trade date is missing, using current date");
                     formattedTradeDate = new Date().toISOString().split("T")[0];
                 }
 
@@ -488,6 +508,7 @@ const AddTrade: React.FC<AddTradeProps> = ({
                     setOpen(true);
                 });
             } else {
+                resetAllState();
                 setOpen(true);
             }
         } else {
