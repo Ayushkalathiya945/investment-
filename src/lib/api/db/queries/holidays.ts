@@ -20,6 +20,7 @@ export async function checkHoliday(date: Date, tx?: TransactionType) {
         where: and(
             eq(holidays.date, date.toISOString().split("T")[0]),
             eq(holidays.exchange, "BSE"),
+            eq(holidays.isClosed, 1),
         ),
     });
 
@@ -39,6 +40,7 @@ export async function getHolidayList(from: string, to: string, tx?: TransactionT
         .where(and(
             gte(holidays.date, from.split("T")[0]),
             lte(holidays.date, to.split("T")[0]),
+            eq(holidays.isClosed, 1),
         ));
 
     return holiday;

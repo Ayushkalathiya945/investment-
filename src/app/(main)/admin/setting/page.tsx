@@ -110,6 +110,30 @@ function HolidayList({
     );
 }
 
+function getWorkingDaysInQuarter(year: number) {
+    const quarters = [
+        { start: new Date(year, 0, 1), end: new Date(year, 2, 31) }, // Q1: Jan-Mar
+        { start: new Date(year, 3, 1), end: new Date(year, 5, 30) }, // Q2: Apr-Jun
+        { start: new Date(year, 6, 1), end: new Date(year, 8, 30) }, // Q3: Jul-Sep
+        { start: new Date(year, 9, 1), end: new Date(year, 11, 31) }, // Q4: Oct-Dec
+    ];
+
+    return quarters.map((q, index) => {
+        let count = 0;
+        const date = new Date(q.start);
+
+        while (date <= q.end) {
+            const day = date.getDay();
+            if (day !== 0 && day !== 6) {
+                count++;
+            }
+            date.setDate(date.getDate() + 1);
+        }
+
+        return { quarterNumber: index + 1, daysInQuarter: count };
+    });
+}
+
 function Page() {
     const queryClient = useQueryClient();
     const currentYear = new Date().getFullYear();
@@ -117,12 +141,7 @@ function Page() {
 
     const defaultValues: Partial<QuarterFormValues> = {
         year: currentYear,
-        quarters: [
-            { quarterNumber: 1, daysInQuarter: 64 },
-            { quarterNumber: 2, daysInQuarter: 65 },
-            { quarterNumber: 3, daysInQuarter: 66 },
-            { quarterNumber: 4, daysInQuarter: 66 },
-        ],
+        quarters: getWorkingDaysInQuarter(currentYear),
     };
 
     const form = useForm<QuarterFormValues>({
