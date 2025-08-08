@@ -450,7 +450,7 @@ function Page() {
                             <div>
                                 <CardTitle>
                                     Holidays for
-                                    {selectedYear}
+                                    { ` ${selectedYear}`}
                                 </CardTitle>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     View and refresh holiday data for NSE and BSE exchanges
