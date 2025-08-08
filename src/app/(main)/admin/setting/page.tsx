@@ -349,6 +349,32 @@ function Page() {
             {/* Conditional Alert Messages */}
             {hasExistingData ? renderExistingDataAlert() : renderNoDataAlert()}
 
+            {/* Year Selection - Now outside tabs */}
+            <div className="flex items-center justify-between">
+                <div className="w-full max-w-sm">
+                    <label className="text-sm font-medium text-foreground">Year</label>
+                    <Select
+                        onValueChange={(value) => {
+                            const year = Number(value);
+                            setSelectedYear(year);
+                            form.setValue("year", year);
+                        }}
+                        value={selectedYear.toString()}
+                    >
+                        <SelectTrigger className="mt-2">
+                            <SelectValue placeholder="Select year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Array.from({ length: 4 }, (_, i) => currentYear - 3 + i).map(year => (
+                                <SelectItem key={year} value={year.toString()}>
+                                    {year}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
             <Tabs defaultValue="quarters" className="w-full">
                 <TabsList className="grid w-full max-w-md grid-cols-2">
                     <TabsTrigger value="quarters">Quarter Days</TabsTrigger>
@@ -364,41 +390,6 @@ function Page() {
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                                     <div className="space-y-4">
-                                        {/* Year Field */}
-                                        <div className="w-full max-w-sm">
-                                            <FormField
-                                                control={form.control}
-                                                name="year"
-                                                render={() => (
-                                                    <FormItem>
-                                                        <FormLabel>Year</FormLabel>
-                                                        <Select
-                                                            onValueChange={(value) => {
-                                                                const year = Number(value);
-                                                                setSelectedYear(year);
-                                                                form.setValue("year", year);
-                                                            }}
-                                                            value={selectedYear.toString()}
-                                                        >
-                                                            <FormControl>
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Select year" />
-                                                                </SelectTrigger>
-                                                            </FormControl>
-                                                            <SelectContent>
-                                                                {Array.from({ length: 4 }, (_, i) => currentYear - 3 + i).map(year => (
-                                                                    <SelectItem key={year} value={year.toString()}>
-                                                                        {year}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </div>
-
                                         {/* Quarters Grid */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
                                             {form.getValues("quarters")?.map((quarter, index) => (
