@@ -36,8 +36,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { quarterFormSchema } from "@/lib/api/utils/validation-schemas";
 
-// Move this to the top of the file (before `Page` component)
-
 function HolidayList({
     holidays,
     exchange,
@@ -174,7 +172,7 @@ function Page() {
             queryClient.invalidateQueries({ queryKey: ["quarter"] });
         },
         onError: () => {
-            toast.error("Failed to refresh holidays data. Please try again.");
+            toast.error("Failed to refresh holidays data. Please try again." );
         },
     });
 
@@ -369,7 +367,7 @@ function Page() {
                                                                 </SelectTrigger>
                                                             </FormControl>
                                                             <SelectContent>
-                                                                {Array.from({ length: 7 }, (_, i) => currentYear - 3 + i).map(year => (
+                                                                {Array.from({ length: 4 }, (_, i) => currentYear - 3 + i).map(year => (
                                                                     <SelectItem key={year} value={year.toString()}>
                                                                         {year}
                                                                     </SelectItem>
@@ -450,7 +448,7 @@ function Page() {
                             <div>
                                 <CardTitle>
                                     Holidays for
-                                    { ` ${selectedYear}`}
+                                    {` ${selectedYear}`}
                                 </CardTitle>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     View and refresh holiday data for NSE and BSE exchanges
